@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MemoryAll</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+:root{--bg:#f6f7f9;--panel:#fff;--line:#e7e9ee;--text:#16181d;--sub:#6b7280;--accent:#4f46e5;--accent-soft:#eef2ff;--green:#10b981;--red:#ef4444;--blue:#3b82f6;--r:14px}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Pretendard,-apple-system,system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:14.5px;-webkit-font-smoothing:antialiased}
+.app{display:flex;min-height:100vh}
+.side{width:236px;background:var(--panel);border-right:1px solid var(--line);padding:22px 14px;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;flex-shrink:0}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px;padding:0 8px 22px;letter-spacing:-.02em}
+.mark{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;display:grid;place-items:center;font-size:15px}
+nav button{display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border:0;background:none;border-radius:10px;color:var(--sub);font:inherit;font-weight:500;cursor:pointer;margin-bottom:2px;transition:.15s}
+nav button svg{width:18px;height:18px;flex-shrink:0}
+nav button:hover{background:#f3f4f6;color:var(--text)}
+nav button.on{background:var(--accent-soft);color:var(--accent)}
+nav em{margin-left:auto;font-style:normal;font-size:11px;font-weight:700;background:var(--accent);color:#fff;border-radius:99px;padding:1px 7px}
+nav em:empty{display:none}
+main{flex:1;padding:36px 44px;max-width:1120px;width:100%;min-width:0}
+h1{font-size:24px;font-weight:700;letter-spacing:-.02em}
+h2{font-size:18px;font-weight:700;margin-bottom:6px}
+.head{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:24px;gap:12px;flex-wrap:wrap}
+.sub{color:var(--sub);font-size:13.5px;margin-top:4px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:20px}
+.grid{display:grid;gap:14px}
+.g4{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+.g2{grid-template-columns:repeat(auto-fit,minmax(340px,1fr))}
+.stat .n{font-size:28px;font-weight:700;letter-spacing:-.02em;margin-top:6px}
+.stat .n span{font-size:14px;color:var(--sub);font-weight:500;margin-left:3px}
+.stat .l{color:var(--sub);font-size:13px}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:10px;border:1px solid var(--line);background:#fff;font:inherit;font-weight:600;font-size:13.5px;cursor:pointer;color:var(--text);transition:.15s;white-space:nowrap}
+.btn:hover{background:#f9fafb;border-color:#d6d9e0}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.pri:hover{background:#4338ca}
+.btn.ghost{border-color:transparent;background:none}
+.btn.ghost:hover{background:#f3f4f6}
+.btn.sm{padding:6px 11px;font-size:12.5px}
+.btn.danger{color:var(--red)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+input,textarea,select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;font:inherit;background:#fff;color:var(--text);outline:none;transition:.15s}
+input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+textarea{resize:vertical;min-height:80px;line-height:1.5}
+label.f{display:block;font-size:12.5px;font-weight:600;color:var(--sub);margin:12px 0 6px}
+.chk{display:inline-flex;align-items:center;gap:7px;font-size:13.5px;cursor:pointer}
+.chk input{width:auto;accent-color:var(--accent)}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:600;background:#f3f4f6;color:var(--sub)}
+.pill.blue{background:#eff6ff;color:var(--blue)}.pill.green{background:#ecfdf5;color:#059669}.pill.red{background:#fef2f2;color:var(--red)}
+.list-item{display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px solid var(--line);gap:12px}
+.list-item:last-child{border-bottom:0}
+table{width:100%;border-collapse:collapse}
+td,th{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;font-size:13.5px}
+th{color:var(--sub);font-weight:600;font-size:12.5px}
+code{background:#f3f4f6;padding:1px 6px;border-radius:5px;font-size:12.5px}
+pre{background:#f6f7f9;border:1px solid var(--line);padding:10px;border-radius:8px;overflow:auto;font-size:12.5px}
+.empty{text-align:center;color:var(--sub);padding:36px 12px}
+.study{max-width:700px;margin:0 auto}
+.flash{min-height:290px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:40px 32px;font-size:22px;line-height:1.55;font-weight:500;cursor:pointer}
+.flash .ans{margin-top:22px;padding-top:22px;border-top:1px dashed var(--line);width:100%;color:#374151;font-size:20px}
+.flash .hint{font-size:13.5px;color:var(--sub);margin-top:14px;font-weight:400}
+.note{margin-top:16px;padding:12px 14px;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;font-size:14px;color:#92400e;text-align:left;width:100%;line-height:1.6;font-weight:400;white-space:pre-wrap}
+.cloze{background:var(--accent-soft);color:var(--accent);padding:0 6px;border-radius:6px;font-weight:700}
+.grades{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:16px}
+.grades button{padding:12px;border-radius:12px;border:1px solid var(--line);background:#fff;font:inherit;font-weight:700;cursor:pointer;transition:.15s}
+.grades button small{display:block;font-weight:500;color:var(--sub);font-size:11.5px;margin-top:2px}
+.g1{color:#dc2626}.g2{color:#d97706}.g3{color:#059669}.g4{color:#2563eb}
+.grades button:hover{background:#f9fafb;transform:translateY(-1px)}
+.grades button.sug{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.progress{height:6px;background:#eceef2;border-radius:99px;overflow:hidden;margin-bottom:18px}
+.progress i{display:block;height:100%;background:var(--accent);transition:.3s}
+.choice{display:grid;gap:10px;margin-top:14px}
+.choice button{text-align:left;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:#fff;font:inherit;cursor:pointer;color:var(--text);transition:.15s}
+.choice button:hover:not(:disabled){border-color:var(--accent)}
+.choice button:disabled{cursor:default}
+.choice button.ok{border-color:var(--green);background:#ecfdf5}
+.choice button.no{border-color:var(--red);background:#fef2f2}
+.tabs{display:inline-flex;background:#eef0f3;padding:4px;border-radius:11px;gap:2px;flex-wrap:wrap}
+.tabs button{border:0;background:none;padding:7px 14px;border-radius:8px;font:inherit;font-weight:600;font-size:13px;color:var(--sub);cursor:pointer}
+.tabs button.on{background:#fff;color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,.07)}
+.heat{display:grid;grid-auto-flow:column;grid-template-rows:repeat(7,12px);gap:3px;width:max-content}
+.heat i{width:12px;height:12px;border-radius:3px;background:#eef0f3}
+.heat i.l1{background:#c7d2fe}.heat i.l2{background:#a5b4fc}.heat i.l3{background:#818cf8}.heat i.l4{background:#4f46e5}.heat i.fut{background:transparent}
+.bars{display:flex;align-items:stretch;gap:6px;height:160px;margin-top:14px}
+.bar{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px}
+.bar .bw{flex:1;width:100%;display:flex;align-items:flex-end;justify-content:center}
+.bar .bw i{width:100%;max-width:26px;border-radius:6px 6px 2px 2px;min-height:2px}
+.bar .lb,.bar .v{font-size:10.5px;color:var(--sub);height:14px}
+.stack{display:flex;height:12px;border-radius:99px;overflow:hidden;margin:14px 0 10px;background:#eef0f3}
+.chat{display:flex;flex-direction:column;height:calc(100vh - 170px);min-height:420px}
+.msgs{flex:1;overflow:auto;padding:4px 2px 16px;display:flex;flex-direction:column;gap:12px}
+.msg{max-width:82%;padding:12px 15px;border-radius:14px;line-height:1.65;white-space:pre-wrap;word-break:break-word}
+.msg.u{align-self:flex-end;background:var(--accent);color:#fff;border-bottom-right-radius:4px}
+.msg.a{align-self:flex-start;background:#fff;border:1px solid var(--line);border-bottom-left-radius:4px}
+.msg.t{align-self:flex-start;font-size:12px;color:var(--sub);background:#f0f1f4;padding:6px 11px;border-radius:8px}
+.chip{display:inline-block;margin:4px;padding:8px 14px;border:1px solid var(--line);border-radius:99px;background:#fff;cursor:pointer;font:inherit;font-size:13px;color:var(--text)}
+.chip:hover{border-color:var(--accent);color:var(--accent)}
+.gen{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);cursor:pointer;line-height:1.5}
+.gen input{width:auto;margin-top:4px;accent-color:var(--accent)}
+.gen.off{opacity:.45}
+.modal{position:fixed;inset:0;background:rgba(17,24,39,.35);display:grid;place-items:center;z-index:50;backdrop-filter:blur(2px)}
+.modal.hidden{display:none}
+.modal-box{background:#fff;border-radius:16px;padding:24px;width:min(560px,92vw);max-height:88vh;overflow:auto;box-shadow:0 20px 50px rgba(0,0,0,.15)}
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#111827;color:#fff;padding:10px 18px;border-radius:10px;font-size:13.5px;opacity:0;transition:.25s;pointer-events:none;z-index:60;max-width:90vw}
+#toast.show{opacity:1;transform:translateX(-50%)}
+.timer{margin-top:auto;border:1px solid var(--line);border-radius:12px;padding:14px;text-align:center}
+.timer .t{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.02em;margin:2px 0 8px}
+kbd{background:#f3f4f6;border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:0 6px;font-size:11.5px;font-family:inherit}
+@media(max-width:820px){.app{flex-direction:column}.side{width:100%;height:auto;position:static;flex-direction:row;align-items:center;overflow-x:auto;padding:10px}.logo{padding:0 10px 0 0}nav{display:flex}nav button span{display:none}.timer{display:none}main{padding:20px}.grades{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="logo"><span class="mark">M</span>MemoryAll</div>
+    <nav id="nav"></nav>
+    <div class="timer">
+      <div class="sub" id="pmM" style="margin:0">집중</div>
+      <div class="t" id="pmT">25:00</div>
+      <div class="row" style="justify-content:center;gap:6px">
+        <button class="btn sm pri" id="pmB" onclick="pmToggle()">시작</button>
+        <button class="btn sm" onclick="pmReset()">리셋</button>
+      </div>
+    </div>
+  </aside>
+  <main id="main"></main>
+</div>
+<div id="modal" class="modal hidden"><div class="modal-box" id="modalBox"></div></div>
+<div id="toast"></div>
+
+<script>
+/* ========== 유틸 ========== */
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const nl=s=>esc(s).replace(/\n/g,'<br>');
+const trunc=(s,n)=>{s=String(s||'');return s.length>n?s.slice(0,n)+'…':s};
+const dayKey=(d=new Date())=>new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10);
+const DAY=864e5;
+const shuffle=a=>{a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+const safeJSON=s=>{try{return typeof s==='string'?JSON.parse(s||'{}'):(s||{})}catch{return{}}};
+const md=s=>esc(s).replace(/```[\w-]*\n?([\s\S]*?)```/g,'<pre>$1</pre>').replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/`([^`\n]+)`/g,'<code>$1</code>').replace(/^#{1,4}\s?(.+)$/gm,'<b>$1</b>');
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2600)}
+function openModal(h){$('#modalBox').innerHTML=h;$('#modal').classList.remove('hidden');setTimeout(()=>$('#modalBox input,#modalBox textarea')?.focus(),30)}
+function closeModal(){$('#modal').classList.add('hidden')}
+function download(name,text,type='application/json'){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click();URL.revokeObjectURL(a.href)}
+function togglePw(id){const i=$('#'+id);i.type=i.type==='password'?'text':'password'}
+async function fetchJ(url,opt){let r;try{r=await fetch(url,opt)}catch(e){throw new Error('네트워크/CORS 오류 — 주소, 키, CORS 허용 여부를 확인하세요')}
+  if(!r.ok){const t=await r.text().catch(()=>'');throw new Error(`HTTP ${r.status} ${t.slice(0,200)}`)}return r.json()}
+
+/* ========== 암기 텍스트 처리 ========== */
+const CZ=/\{\{(?:c\d+::)?(.+?)\}\}/g, CZT=/\{\{.+?\}\}/;
+const isCloze=c=>CZT.test(c.front||'');
+const clozeQ=s=>esc(s).replace(CZ,'<span class="cloze">[ … ]</span>');
+const clozeA=s=>esc(s).replace(CZ,'<span class="cloze">$1</span>');
+const clozeAnswers=s=>[...String(s).matchAll(CZ)].map(m=>m[1]);
+const answerText=c=>isCloze(c)?clozeAnswers(c.front).join(', '):(c.back||'');
+const norm=s=>String(s).toLowerCase().replace(/[\s.,!?;:'"()\[\]{}\-_/·~]/g,'');
+function lev(a,b){const m=a.length,n=b.length;if(!m)return n;if(!n)return m;let p=[...Array(n+1).keys()];for(let i=1;i<=m;i++){const c=[i];for(let j=1;j<=n;j++)c[j]=Math.min(p[j]+1,c[j-1]+1,p[j-1]+(a[i-1]===b[j-1]?0:1));p=c}return p[n]}
+function sim(a,b){a=norm(a);b=norm(b);if(!a&&!b)return 1;if(!a||!b)return 0;return 1-lev(a,b)/Math.max(a.length,b.length)}
+
+/* ========== 데이터 ========== */
+const PRESETS={
+  openai:{name:'OpenAI',baseUrl:'https://api.openai.com/v1',model:'gpt-4o-mini',fmt:'openai'},
+  anthropic:{name:'Anthropic (Claude)',baseUrl:'https://api.anthropic.com/v1',model:'claude-sonnet-4-5',fmt:'anthropic'},
+  gemini:{name:'Google Gemini',baseUrl:'https://generativelanguage.googleapis.com/v1beta/openai',model:'gemini-2.5-flash',fmt:'openai'},
+  openrouter:{name:'OpenRouter',baseUrl:'https://openrouter.ai/api/v1',model:'openai/gpt-4o-mini',fmt:'openai'},
+  groq:{name:'Groq',baseUrl:'https://api.groq.com/openai/v1',model:'llama-3.3-70b-versatile',fmt:'openai'},
+  ollama:{name:'Ollama (로컬)',baseUrl:'http://localhost:11434/v1',model:'llama3.1',fmt:'openai'},
+  lmstudio:{name:'LM Studio (로컬)',baseUrl:'http://localhost:1234/v1',model:'local-model',fmt:'openai'},
+  custom:{name:'직접 입력 (OpenAI 호환)',baseUrl:'',model:'',fmt:'openai'}
+};
+const DEF={decks:[],cards:[],logs:{},settings:{ai:{provider:'openai',profiles:{}},search:{provider:'wikipedia',keys:{},url:'',lang:'ko'},mcp:[],newPerDay:20,goal:50,ttsLang:'ko-KR'}};
+function merge(a,b){for(const k in b){if(b[k]&&typeof b[k]==='object'&&!Array.isArray(b[k])&&a[k]&&typeof a[k]==='object'&&!Array.isArray(a[k]))merge(a[k],b[k]);else a[k]=b[k]}return a}
+function newCard(deckId,front,back='',hint='',tags=''){return{id:uid(),deckId,front,back,hint,tags,note:'',ease:2.5,interval:0,reps:0,lapses:0,due:0,seen:false,created:Date.now()}}
+function seed(){const d=structuredClone(DEF),id=uid();d.decks.push({id,name:'시작하기',desc:'MemoryAll 사용법 샘플 덱',created:Date.now()});
+  [['간격 반복(Spaced Repetition)이란?','잊어버릴 즈음 다시 복습해 장기 기억으로 옮기는 학습법'],['능동 회상(Active Recall)','답을 보기 전에 스스로 떠올려 보는 것. 다시 읽기보다 훨씬 효과적'],['대한민국의 수도는 {{서울}}이다.',''],['카드 뒤집기 단축키','Space 또는 Enter'],['평가 단축키','1 다시 · 2 어려움 · 3 알맞음 · 4 쉬움']].forEach(([f,b])=>d.cards.push(newCard(id,f,b)));return d}
+function load(){try{const d=JSON.parse(localStorage.getItem('memoryall'));if(d)return merge(structuredClone(DEF),d)}catch{}return seed()}
+let S=load();
+const save=()=>localStorage.setItem('memoryall',JSON.stringify(S));
+const cardById=id=>S.cards.find(c=>c.id===id);
+const deckById=id=>S.decks.find(d=>d.id===id);
+function ensureDeck(name){name=String(name||'새 덱').trim();let d=S.decks.find(x=>x.name===name);if(!d){d={id:uid(),name,desc:'',created:Date.now()};S.decks.push(d)}return d}
+function deckCounts(id){const now=Date.now(),p=S.cards.filter(c=>!id||c.deckId===id);return{total:p.length,new:p.filter(c=>!c.seen).length,due:p.filter(c=>c.seen&&c.due<=now).length}}
+const newLimit=()=>Math.max(0,S.settings.newPerDay-(S.logs[dayKey()]?.n||0));
+function logReview(ok,first){const k=dayKey(),l=S.logs[k]||(S.logs[k]={r:0,c:0,n:0});l.r++;if(ok)l.c++;if(first)l.n++}
+function streak(){let n=0;const d=new Date();if(!S.logs[dayKey(d)]?.r)d.setDate(d.getDate()-1);while(S.logs[dayKey(d)]?.r){n++;d.setDate(d.getDate()-1)}return n}
+
+/* ========== 간격 반복 (SM-2 변형) ========== */
+function nextState(c,g){const n={...c},now=Date.now();n.ease=n.ease||2.5;
+  if(g===1){n.lapses=(n.lapses||0)+1;n.reps=0;n.interval=0;n.ease=Math.max(1.3,n.ease-.2);n.due=now+10*6e4;return n}
+  let iv;
+  if(!n.reps)iv=g===4?4:1;
+  else if(n.reps===1)iv=g===2?3:g===3?6:9;
+  else iv=Math.max(n.interval+1,Math.round(n.interval*(g===2?1.2:g===3?n.ease:n.ease*1.3)));
+  n.ease=Math.max(1.3,n.ease+(g===2?-.15:g===4?.15:0));n.reps++;n.interval=iv;n.due=now+iv*DAY;return n}
+function fmtIv(c,g){if(g===1)return '10분';const d=nextState(c,g).interval;return d<30?d+'일':d<365?(d/30).toFixed(1).replace('.0','')+'개월':(d/365).toFixed(1).replace('.0','')+'년'}
+function buildQueue(deckId){const now=Date.now(),p=S.cards.filter(c=>!deckId||c.deckId===deckId);
+  const due=p.filter(c=>c.seen&&c.due<=now),nw=p.filter(c=>!c.seen).slice(0,newLimit());return shuffle([...due,...nw]).map(c=>c.id)}
+
+/* ========== 아이콘 / 내비게이션 ========== */
+const svg=p=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+const ICON={home:'<path d="M3 10.5 12 3l9 7.5V21H3z"/><path d="M9 21v-6h6v6"/>',layers:'<path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/>',play:'<path d="M7 4 20 12 7 20z"/>',spark:'<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 17v4M17 19h4"/>',chat:'<path d="M21 12a8 8 0 0 1-11.6 7.1L4 21l1.9-5.4A8 8 0 1 1 21 12z"/>',chart:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',gear:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/>'};
+const NAV=[['home','대시보드','home'],['decks','덱','layers'],['study','학습','play'],['ai','AI 카드 생성','spark'],['tutor','AI 튜터','chat'],['stats','통계','chart'],['settings','설정','gear']];
+$('#nav').innerHTML=NAV.map(([v,l,i])=>`<button data-v="${v}" onclick="go('${v}')">${svg(ICON[i])}<span>${l}</span>${v==='study'?'<em id="dueBadge"></em>':''}</button>`).join('');
+
+let VIEW='home',PARAM=null,DECKQ='',ST=null;
+const SETUP={deck:'',mode:'flip',scope:'due'};
+function go(v,p=null){if(v==='deck'&&p!==PARAM)DECKQ='';VIEW=v;PARAM=p;render();window.scrollTo(0,0)}
+function render(){const nv=VIEW==='deck'?'decks':VIEW;$$('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===nv));
+  const q=buildQueue(null).length;$('#dueBadge').textContent=q||'';
+  ({home:vHome,decks:vDecks,deck:vDeck,study:vStudy,ai:vAI,tutor:vTutor,stats:vStats,settings:vSettings})[VIEW]($('#main'))}
+
+/* ========== 대시보드 ========== */
+const TIPS=[['능동 회상','답을 보기 전에 먼저 떠올려 보세요. 떠올리려는 노력 자체가 기억을 강화해요.'],['간격 반복','잊을 즈음 복습하면 적은 횟수로 오래 기억해요. 매일 조금씩이 핵심이에요.'],['최소 정보 원칙','카드 하나에 사실 하나만. 복잡한 내용은 여러 장으로 쪼개세요.'],['인터리빙','여러 주제를 섞어서 학습하면 구분 능력과 응용력이 좋아져요.'],['정교화와 연상','이미지, 이야기, 어원, 두문자로 기존 지식과 연결하세요.'],['수면','자는 동안 기억이 정리돼요. 밤샘보다 매일 적당히 자고 복습하는 게 좋아요.']];
+const stat=(l,n,u)=>`<div class="card stat"><div class="l">${l}</div><div class="n">${n}<span>${u}</span></div></div>`;
+function greet(){const h=new Date().getHours();return h<12?'좋은 아침이에요':h<18?'좋은 오후예요':'좋은 저녁이에요'}
+function heatmap(w){const t=new Date();t.setHours(0,0,0,0);const s=new Date(t);s.setDate(t.getDate()-t.getDay()-(w-1)*7);let h='';
+  for(let i=0;i<w*7;i++){const d=new Date(s);d.setDate(s.getDate()+i);const k=dayKey(d),r=S.logs[k]?.r||0;const lv=d>t?'fut':'l'+(r===0?0:r<10?1:r<30?2:r<60?3:4);h+=`<i class="${lv}" title="${k} · ${r}회"></i>`}
+  return `<div class="heat">${h}</div>`}
+function vHome(m){const k=deckCounts(null),tl=S.logs[dayKey()]||{r:0},goal=S.settings.goal,pct=Math.min(100,Math.round(tl.r/goal*100));
+  m.innerHTML=`<div class="head"><div><h1>${greet()}</h1><div class="sub">${new Date().toLocaleDateString('ko-KR',{month:'long',day:'numeric',weekday:'long'})} · 오늘도 조금씩 기억을 쌓아요</div></div><button class="btn pri" onclick="startStudy(null,'flip','due')">지금 학습하기</button></div>
+  <div class="grid g4">${stat('복습 대기',k.due,'장')}${stat('새 카드',k.new,'장')}${stat('연속 학습',streak(),'일')}${stat('오늘 학습',tl.r,'회')}</div>
+  <div class="grid g2" style="margin-top:14px">
+    <div class="card"><div class="row" style="justify-content:space-between"><b>일일 목표</b><span class="sub" style="margin:0">${tl.r} / ${goal}</span></div>
+      <div class="progress" style="margin:14px 0 20px"><i style="width:${pct}%"></i></div><b>학습 기록</b><div style="margin-top:12px;overflow-x:auto">${heatmap(20)}</div></div>
+    <div class="card"><b>덱</b>${S.decks.length?S.decks.slice(0,5).map(d=>{const c=deckCounts(d.id);return `<div class="list-item"><div><div style="font-weight:600">${esc(d.name)}</div><div class="sub">${c.total}장</div></div><div class="row"><span class="pill blue">새 ${c.new}</span><span class="pill green">복습 ${c.due}</span><button class="btn sm" onclick="startStudy('${d.id}','flip','due')">학습</button></div></div>`}).join(''):'<div class="empty">덱이 없어요</div>'}</div>
+  </div>
+  <div class="card" style="margin-top:14px"><b>과학적으로 검증된 암기 원칙</b><div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));margin-top:14px;gap:18px">${TIPS.map(t=>`<div><div style="font-weight:600;margin-bottom:4px">${t[0]}</div><div class="sub" style="line-height:1.55">${t[1]}</div></div>`).join('')}</div></div>`}
+
+/* ========== 덱 ========== */
+function vDecks(m){m.innerHTML=`<div class="head"><div><h1>덱</h1><div class="sub">주제별로 카드를 묶어 관리하세요</div></div><button class="btn pri" onclick="deckModal()">+ 새 덱</button></div>
+  ${S.decks.length?`<div class="grid g2">${S.decks.map(d=>{const k=deckCounts(d.id);return `<div class="card"><div style="font-weight:700;font-size:16px">${esc(d.name)}</div><div class="sub" style="min-height:20px">${esc(d.desc||'')}</div><div class="row" style="margin:14px 0"><span class="pill">${k.total}장</span><span class="pill blue">새 ${k.new}</span><span class="pill green">복습 ${k.due}</span></div><div class="row"><button class="btn pri sm" onclick="startStudy('${d.id}','flip','due')">학습</button><button class="btn sm" onclick="go('deck','${d.id}')">카드 관리</button></div></div>`}).join('')}</div>`:`<div class="card empty">아직 덱이 없어요. 새 덱을 만들거나 AI로 카드를 생성해 보세요.</div>`}`}
+function deckModal(id){const d=id?deckById(id):{name:'',desc:''};openModal(`<h2>${id?'덱 편집':'새 덱'}</h2><label class="f">이름</label><input id="dN" value="${esc(d.name)}" placeholder="예: 토익 영단어"><label class="f">설명</label><input id="dD" value="${esc(d.desc)}"><div class="row" style="justify-content:flex-end;margin-top:18px"><button class="btn" onclick="closeModal()">취소</button><button class="btn pri" onclick="saveDeck('${id||''}')">저장</button></div>`)}
+function saveDeck(id){const name=$('#dN').value.trim();if(!name)return toast('이름을 입력하세요');if(id){const d=deckById(id);d.name=name;d.desc=$('#dD').value.trim()}else{const d={id:uid(),name,desc:$('#dD').value.trim(),created:Date.now()};S.decks.push(d);PARAM=d.id;VIEW='deck'}save();closeModal();render()}
+function delDeck(id){if(!confirm('덱과 안의 모든 카드를 삭제할까요?'))return;S.decks=S.decks.filter(d=>d.id!==id);S.cards=S.cards.filter(c=>c.deckId!==id);save();go('decks')}
+function stateP(c){return !c.seen?'<span class="pill blue">새 카드</span>':c.interval<21?'<span class="pill">학습 중</span>':'<span class="pill green">숙달</span>'}
+function dueStr(c){if(!c.seen)return '-';const d=c.due-Date.now();if(d<=0)return '지금';if(d<DAY)return Math.ceil(d/36e5)+'시간 후';return Math.round(d/DAY)+'일 후'}
+function cardRows(list){return list.map(c=>`<tr><td>${isCloze(c)?clozeA(trunc(c.front,90)):nl(trunc(c.front,90))}</td><td>${nl(trunc(c.back,90))}</td><td>${stateP(c)}</td><td class="sub">${dueStr(c)}</td><td style="white-space:nowrap;text-align:right"><button class="btn sm ghost" onclick="editCard('${c.id}')">편집</button><button class="btn sm ghost danger" onclick="delCard('${c.id}')">삭제</button></td></tr>`).join('')||'<tr><td colspan="5" class="empty">카드가 없어요</td></tr>'}
+function filteredCards(id){const q=DECKQ.toLowerCase();return S.cards.filter(c=>c.deckId===id&&(!q||(c.front+' '+c.back+' '+c.tags).toLowerCase().includes(q)))}
+function vDeck(m){const d=deckById(PARAM);if(!d)return go('decks');const total=S.cards.filter(c=>c.deckId===d.id).length;
+  m.innerHTML=`<div class="head"><div><button class="btn ghost sm" onclick="go('decks')" style="padding-left:0;margin-bottom:6px">← 덱 목록</button><h1>${esc(d.name)}</h1><div class="sub">${d.desc?esc(d.desc)+' · ':''}${total}장</div></div>
+  <div class="row"><button class="btn pri" onclick="startStudy('${d.id}','flip','due')">학습</button><button class="btn" onclick="deckModal('${d.id}')">편집</button><button class="btn" onclick="exportCSV('${d.id}')">CSV 내보내기</button><button class="btn danger" onclick="delDeck('${d.id}')">삭제</button></div></div>
+  <div class="grid g2">
+    <div class="card"><b>카드 추가</b>
+      <label class="f">앞면 (질문)</label><textarea id="nF" placeholder="예: 광합성이 일어나는 세포 소기관은?&#10;빈칸 카드: 광합성은 {{엽록체}}에서 일어난다"></textarea>
+      <label class="f">뒷면 (정답)</label><textarea id="nB" placeholder="빈칸 카드는 비워도 돼요"></textarea>
+      <div class="row" style="flex-wrap:nowrap"><div style="flex:1"><label class="f">힌트</label><input id="nH"></div><div style="flex:1"><label class="f">태그</label><input id="nT" placeholder="쉼표로 구분"></div></div>
+      <div class="row" style="justify-content:space-between;margin-top:14px"><span class="sub" style="margin:0"><kbd>Ctrl</kbd> + <kbd>Enter</kbd> 로 추가</span><button class="btn pri" onclick="addCard('${d.id}')">추가</button></div></div>
+    <div class="card"><b>일괄 가져오기</b><div class="sub">한 줄에 카드 하나 · 앞면과 뒷면은 탭, |, ::, " - ", 쉼표 중 하나로 구분</div>
+      <textarea id="bulk" style="min-height:172px;margin-top:12px" placeholder="apple | 사과&#10;banana | 바나나&#10;물의 화학식은 {{H2O}}이다"></textarea>
+      <div class="row" style="margin-top:12px"><label class="btn sm" style="margin-right:auto">파일 열기 (CSV/TXT)<input type="file" accept=".csv,.txt,.tsv" hidden onchange="loadBulkFile(this)"></label><button class="btn pri" onclick="bulkAdd('${d.id}')">가져오기</button></div></div>
+  </div>
+  <div class="card" style="margin-top:14px"><div class="row" style="justify-content:space-between"><b>카드 목록</b><input id="dq" placeholder="앞면, 뒷면, 태그 검색" style="max-width:260px" value="${esc(DECKQ)}"></div>
+  <div style="overflow-x:auto"><table style="margin-top:10px"><thead><tr><th>앞면</th><th>뒷면</th><th>상태</th><th>다음 복습</th><th></th></tr></thead><tbody id="cRows">${cardRows(filteredCards(d.id))}</tbody></table></div></div>`;
+  $('#dq').oninput=e=>{DECKQ=e.target.value;$('#cRows').innerHTML=cardRows(filteredCards(d.id))};
+  ['#nF','#nB','#nH','#nT'].forEach(s=>$(s).onkeydown=e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();addCard(d.id)}})}
+function addCard(did){const f=$('#nF').value.trim(),b=$('#nB').value.trim();if(!f)return toast('앞면을 입력하세요');if(!b&&!CZT.test(f))return toast('뒷면을 입력하거나 {{ }} 빈칸을 사용하세요');
+  S.cards.push(newCard(did,f,b,$('#nH').value.trim(),$('#nT').value.trim()));save();['#nF','#nB','#nH'].forEach(s=>$(s).value='');$('#nF').focus();$('#cRows').innerHTML=cardRows(filteredCards(did));toast('카드를 추가했어요')}
+function splitLine(l){for(const s of ['\t',' | ','|','::',' - ',',']){const i=l.indexOf(s);if(i>0)return[l.slice(0,i).trim(),l.slice(i+s.length).trim()]}return[l.trim(),'']}
+function bulkAdd(did){const lines=$('#bulk').value.split('\n').map(l=>l.trim()).filter(Boolean);let n=0;
+  for(const l of lines){let[f,b]=splitLine(l);f=f.replace(/^"|"$/g,'');b=b.replace(/^"|"$/g,'');if(f&&(b||CZT.test(f))){S.cards.push(newCard(did,f,b));n++}}
+  save();toast(`${n}장을 가져왔어요`);render()}
+function loadBulkFile(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=()=>$('#bulk').value=r.result;r.readAsText(f)}
+function exportCSV(did){const q=v=>`"${String(v||'').replace(/"/g,'""')}"`;const rows=[['front','back','hint','tags'],...S.cards.filter(c=>c.deckId===did).map(c=>[c.front,c.back,c.hint,c.tags])];download(deckById(did).name+'.csv','\ufeff'+rows.map(r=>r.map(q).join(',')).join('\n'),'text/csv')}
+function delCard(id){if(!confirm('이 카드를 삭제할까요?'))return;S.cards=S.cards.filter(c=>c.id!==id);if(ST)ST.queue=ST.queue.filter(x=>x!==id);save();render()}
+function editCard(id){const c=cardById(id);openModal(`<h2>카드 편집</h2>
+  <label class="f">앞면</label><textarea id="eF">${esc(c.front)}</textarea>
+  <label class="f">뒷면</label><textarea id="eB">${esc(c.back)}</textarea>
+  <div class="row" style="flex-wrap:nowrap"><div style="flex:1"><label class="f">힌트</label><input id="eH" value="${esc(c.hint)}"></div><div style="flex:1"><label class="f">태그</label><input id="eT" value="${esc(c.tags)}"></div></div>
+  <label class="f">암기법 메모</label><textarea id="eN" style="min-height:60px">${esc(c.note)}</textarea>
+  <label class="f">덱</label><select id="eD">${S.decks.map(d=>`<option value="${d.id}" ${d.id===c.deckId?'selected':''}>${esc(d.name)}</option>`).join('')}</select>
+  <div class="row" style="justify-content:space-between;margin-top:18px"><button class="btn sm danger" onclick="resetCard('${id}')">학습 기록 초기화</button><div class="row"><button class="btn" onclick="closeModal()">취소</button><button class="btn pri" onclick="saveCard('${id}')">저장</button></div></div>`)}
+function saveCard(id){const c=cardById(id);Object.assign(c,{front:$('#eF').value.trim(),back:$('#eB').value.trim(),hint:$('#eH').value.trim(),tags:$('#eT').value.trim(),note:$('#eN').value.trim(),deckId:$('#eD').value});if(ST)ST.opts=null;save();closeModal();render()}
+function resetCard(id){Object.assign(cardById(id),{ease:2.5,interval:0,reps:0,lapses:0,due:0,seen:false});save();closeModal();render();toast('초기화했어요')}
+
+/* ========== 학습 ========== */
+function startStudy(deckId=null,mode='flip',scope='due'){const pool=S.cards.filter(c=>!deckId||c.deckId===deckId);
+  const ids=scope==='all'?shuffle(pool.map(c=>c.id)):buildQueue(deckId);
+  if(!ids.length){ST=null;VIEW='study';render();return toast('지금 복습할 카드가 없어요. "전체 벼락치기"로 학습할 수 있어요')}
+  ST={deckId,mode,scope,queue:ids,done:0,reviews:0,correct:0,start:Date.now(),flipped:false};VIEW='study';render()}
+function endStudy(){ST=null;render()}
+function vStudy(m){if(!ST)return vStudySetup(m);if(!ST.queue.length)return vStudyDone(m);vStudyCard(m)}
+function vStudySetup(m){m.innerHTML=`<div class="head"><div><h1>학습</h1><div class="sub">덱과 학습 방식을 선택하세요</div></div></div>
+  <div class="card" style="max-width:600px">
+    <label class="f" style="margin-top:0">덱</label><select id="sDeck"><option value="">모든 덱</option>${S.decks.map(d=>`<option value="${d.id}">${esc(d.name)}</option>`).join('')}</select>
+    <label class="f">방식</label><div class="tabs" id="sMode">${[['flip','플래시카드'],['type','직접 입력'],['choice','객관식']].map(([k,v])=>`<button data-k="${k}" class="${SETUP.mode===k?'on':''}">${v}</button>`).join('')}</div>
+    <label class="f">범위</label><div class="tabs" id="sScope">${[['due','오늘 복습 (간격 반복)'],['all','전체 벼락치기']].map(([k,v])=>`<button data-k="${k}" class="${SETUP.scope===k?'on':''}">${v}</button>`).join('')}</div>
+    <div class="sub" id="sInfo" style="margin:16px 0"></div>
+    <button class="btn pri" onclick="startStudy(SETUP.deck||null,SETUP.mode,SETUP.scope)">학습 시작</button>
+    <div class="sub" style="margin-top:18px;line-height:1.8"><kbd>Space</kbd> 정답 보기 · <kbd>1</kbd>~<kbd>4</kbd> 평가 (객관식은 보기 선택) · <kbd>Enter</kbd> 추천 평가</div>
+  </div>`;
+  const sel=$('#sDeck');sel.value=SETUP.deck;sel.onchange=()=>{SETUP.deck=sel.value;sInfo()};
+  ['sMode','sScope'].forEach(g=>$$(`#${g} button`).forEach(b=>b.onclick=()=>{SETUP[g==='sMode'?'mode':'scope']=b.dataset.k;$$(`#${g} button`).forEach(x=>x.classList.toggle('on',x===b))}));sInfo()}
+function sInfo(){const k=deckCounts(SETUP.deck||null),lim=newLimit();$('#sInfo').innerHTML=`복습 대기 <b>${k.due}</b> · 새 카드 <b>${Math.min(k.new,lim)}</b>${k.new>lim?` (하루 한도 ${S.settings.newPerDay})`:''} · 전체 <b>${k.total}</b>`}
+function vStudyDone(m){const acc=ST.reviews?Math.round(ST.correct/ST.reviews*100):0,min=Math.max(1,Math.round((Date.now()-ST.start)/6e4));
+  m.innerHTML=`<div class="card study" style="text-align:center;padding:56px 24px"><h1>수고했어요!</h1><div class="sub" style="margin-top:10px">${ST.reviews}번 복습 · 정확도 ${acc}% · 약 ${min}분</div><div class="row" style="justify-content:center;margin-top:24px"><button class="btn" onclick="endStudy()">돌아가기</button><button class="btn pri" onclick="startStudy(ST.deckId,ST.mode,'all')">전체 한 번 더</button></div></div>`}
+function makeOpts(c){const correct=answerText(c),seen=new Set([norm(correct)]),d=[];
+  const same=S.cards.filter(x=>x.id!==c.id&&x.deckId===c.deckId),other=S.cards.filter(x=>x.id!==c.id&&x.deckId!==c.deckId);
+  for(const x of [...shuffle(same),...shuffle(other)]){const t=answerText(x);if(!t||seen.has(norm(t)))continue;seen.add(norm(t));d.push(t);if(d.length===3)break}
+  ST.correctText=correct;ST.opts=shuffle([correct,...d])}
+function vStudyCard(m){const c=cardById(ST.queue[0]);if(!c){ST.queue.shift();return vStudy(m)}
+  let cur=ST.mode;if(cur!=='flip'&&!answerText(c))cur='flip';if(cur==='choice'){if(!ST.opts)makeOpts(c);if(ST.opts.length<2)cur='flip'}ST.cur=cur;
+  const cz=isCloze(c),R=ST.flipped,total=ST.done+ST.queue.length;
+  const Q=cz?clozeQ(c.front):nl(c.front);
+  const A=cz?clozeA(c.front)+(c.back?`<div class="sub" style="margin-top:10px;font-size:15px">${nl(c.back)}</div>`:''):nl(c.back);
+  const hint=ST.showHint&&c.hint?`<div class="hint">힌트 · ${esc(c.hint)}</div>`:'';
+  const note=R&&c.note?`<div class="note"><b>암기법</b>\n${esc(c.note)}</div>`:'';
+  let body='';
+  if(cur==='flip')body=`<div class="card flash" onclick="flip()"><div>${Q}</div>${hint}${R?`<div class="ans">${A}</div>${note}`:'<div class="hint">클릭하거나 Space를 눌러 정답 확인</div>'}</div>`;
+  else if(cur==='type'){const a=ST.answer;body=`<div class="card flash" style="cursor:default"><div>${Q}</div>${hint}${R?`<div class="ans">${A}</div>${note}`:''}</div>
+    ${R?`<div class="card" style="margin-top:12px;padding:14px"><div class="row">${a.ok?'<span class="pill green">정답</span>':a.s>=.75?'<span class="pill blue">거의 맞음</span>':'<span class="pill red">오답</span>'}<span class="sub" style="margin:0">내 답: ${esc(a.given)||'(비어 있음)'} · 일치도 ${Math.round(a.s*100)}%</span></div></div>`
+    :`<div class="row" style="margin-top:14px;flex-wrap:nowrap"><input id="typeIn" placeholder="정답을 입력하고 Enter" autocomplete="off"><button class="btn pri" onclick="checkType()">확인</button></div>`}`}
+  else body=`<div class="card flash" style="cursor:default;min-height:200px"><div>${Q}</div>${hint}${R?note:''}</div>
+    <div class="choice">${ST.opts.map((o,i)=>{const cls=R?(o===ST.correctText?'ok':i===ST.picked?'no':''):'';return `<button class="${cls}" onclick="pickOpt(${i})" ${R?'disabled':''}><span class="sub" style="margin:0 10px 0 0">${i+1}</span>${nl(trunc(o,160))}</button>`}).join('')}</div>`;
+  const G=[['다시',1],['어려움',2],['알맞음',3],['쉬움',4]];
+  m.innerHTML=`<div class="study">
+    <div class="row" style="justify-content:space-between;margin-bottom:10px"><span class="sub" style="margin:0">${esc(deckById(ST.deckId)?.name||'모든 덱')} · ${{flip:'플래시카드',type:'직접 입력',choice:'객관식'}[ST.mode]}${!c.seen?' · <span class="pill blue">새 카드</span>':''}</span><div class="row"><span class="sub" style="margin:0">${ST.done} / ${total}</span><button class="btn sm ghost" onclick="endStudy()">종료</button></div></div>
+    <div class="progress"><i style="width:${ST.done/total*100}%"></i></div>
+    ${body}
+    <div class="row" style="justify-content:center;margin-top:12px;gap:4px">
+      <button class="btn sm ghost" onclick="speak()">소리 듣기</button>
+      ${c.hint?`<button class="btn sm ghost" onclick="ST.showHint=!ST.showHint;render()">힌트</button>`:''}
+      <button class="btn sm ghost" onclick="aiMnemonic()">AI 암기법</button>
+      <button class="btn sm ghost" onclick="askTutor()">AI 설명</button>
+      <button class="btn sm ghost" onclick="editCard('${c.id}')">편집</button>
+    </div>
+    ${R?`<div class="grades">${G.map(([l,g])=>`<button class="g${g} ${ST.suggest===g?'sug':''}" onclick="grade(${g})">${l}<small>${fmtIv(c,g)} · ${g}</small></button>`).join('')}</div>`:''}
+  </div>`;
+  if(cur==='type'&&!R)setTimeout(()=>$('#typeIn')?.focus(),20)}
+function flip(){if(ST&&ST.cur==='flip'&&!ST.flipped){ST.flipped=true;render()}}
+function checkType(){const c=cardById(ST.queue[0]),given=$('#typeIn').value.trim(),ans=answerText(c);
+  const parts=[ans,...ans.split(/[,;/]|또는/)].map(s=>s.trim()).filter(Boolean);const s=Math.max(...parts.map(p=>sim(given,p)));
+  ST.answer={ok:s>=.9,s,given};ST.suggest=s>=.9?3:s>=.75?2:1;ST.flipped=true;render()}
+function pickOpt(i){if(ST.flipped)return;ST.picked=i;ST.suggest=ST.opts[i]===ST.correctText?3:1;ST.flipped=true;render()}
+function grade(g){const c=cardById(ST.queue[0]);if(!c)return;const first=!c.seen;Object.assign(c,nextState(c,g));c.seen=true;logReview(g>1,first);
+  ST.queue.shift();ST.reviews++;if(g>1){ST.correct++;ST.done++}else ST.queue.splice(Math.min(3,ST.queue.length),0,c.id);
+  Object.assign(ST,{flipped:false,answer:null,suggest:null,opts:null,picked:null,showHint:false});save();render()}
+function speak(){const c=cardById(ST?.queue[0]);if(!c)return;const cz=isCloze(c);
+  const t=ST.flipped?(cz?c.front.replace(CZ,'$1')+'. '+c.back:c.back):(cz?c.front.replace(CZ,'빈칸'):c.front);
+  speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.lang=S.settings.ttsLang;speechSynthesis.speak(u)}
+async function aiMnemonic(){const c=cardById(ST.queue[0]);toast('AI가 암기법을 만드는 중...');
+  try{const r=await callLLM([{role:'system',content:'너는 기억술 전문가다. 짧고 선명한 암기법만 출력한다. 서론 금지.'},{role:'user',content:`다음 카드를 오래 기억할 수 있는 암기법을 만들어줘. 연상 이미지, 어원, 두문자, 이야기, 비슷한 것과의 대비 중 가장 효과적인 방법 1~2개를 골라 3줄 이내로. 카드와 같은 언어로 답해.\n앞면: ${c.front}\n뒷면: ${c.back}`}]);
+    c.note=r.text.trim();save();ST.flipped=true;render()}catch(e){toast(e.message)}}
+function askTutor(){const c=cardById(ST.queue[0]);TUTOR.draft=`이 카드 내용을 쉽게 이해되도록 설명하고, 관련 개념도 알려줘.\n앞면: ${c.front.replace(CZ,'$1')}\n뒷면: ${c.back}`;go('tutor')}
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape')return closeModal();
+  if(VIEW!=='study'||!ST||!ST.queue.length||!$('#modal').classList.contains('hidden'))return;
+  const tg=e.target.tagName;if(tg==='INPUT'||tg==='TEXTAREA'||tg==='SELECT'){if(e.key==='Enter'&&e.target.id==='typeIn'&&!e.isComposing){e.preventDefault();checkType()}return}
+  if(!ST.flipped){if(ST.cur==='flip'&&(e.key===' '||e.key==='Enter')){e.preventDefault();flip()}else if(ST.cur==='choice'&&/^[1-4]$/.test(e.key)&&ST.opts?.[+e.key-1]!==undefined)pickOpt(+e.key-1)}
+  else{if(/^[1-4]$/.test(e.key))grade(+e.key);else if(e.key===' '||e.key==='Enter'){e.preventDefault();grade(ST.suggest||3)}}});
+
+/* ========== AI 호출 (OpenAI 호환 + Anthropic) ========== */
+function activeAI(){const a=S.settings.ai,p=PRESETS[a.provider]||PRESETS.custom,pr=a.profiles[a.provider]||{};return{fmt:p.fmt,baseUrl:(pr.baseUrl??p.baseUrl)||'',apiKey:pr.apiKey||'',model:pr.model||p.model}}
+async function callLLM(messages,tools=[]){const a=activeAI();if(!a.baseUrl||!a.model)throw new Error('설정에서 AI API를 먼저 입력하세요');const base=a.baseUrl.replace(/\/$/,'');
+  if(a.fmt==='anthropic'){const sys=messages.filter(m=>m.role==='system').map(m=>m.content).join('\n\n'),out=[];
+    for(const m of messages){if(m.role==='system')continue;let msg;
+      if(m.role==='tool')msg={role:'user',content:[{type:'tool_result',tool_use_id:m.tool_call_id,content:String(m.content)}]};
+      else if(m.role==='assistant'&&m.tool_calls?.length)msg={role:'assistant',content:[...(m.content?[{type:'text',text:m.content}]:[]),...m.tool_calls.map(t=>({type:'tool_use',id:t.id,name:t.name,input:t.args||{}}))]};
+      else msg={role:m.role,content:String(m.content)};
+      const last=out[out.length-1],arr=c=>typeof c==='string'?[{type:'text',text:c}]:c;
+      if(last&&last.role==='user'&&msg.role==='user')last.content=[...arr(last.content),...arr(msg.content)];else out.push(msg)}
+    const body={model:a.model,max_tokens:4096,messages:out};if(sys)body.system=sys;
+    if(tools.length)body.tools=tools.map(t=>({name:t.name,description:t.description,input_schema:t.parameters}));
+    const j=await fetchJ(base+'/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':a.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify(body)});
+    return{text:j.content.filter(b=>b.type==='text').map(b=>b.text).join('\n'),toolCalls:j.content.filter(b=>b.type==='tool_use').map(b=>({id:b.id,name:b.name,args:b.input||{}}))}}
+  const msgs=messages.map(m=>m.role==='assistant'&&m.tool_calls?.length?{role:'assistant',content:m.content||null,tool_calls:m.tool_calls.map(t=>({id:t.id,type:'function',function:{name:t.name,arguments:JSON.stringify(t.args||{})}}))}
+    :m.role==='tool'?{role:'tool',tool_call_id:m.tool_call_id,content:String(m.content)}:{role:m.role,content:m.content});
+  const body={model:a.model,messages:msgs};if(tools.length)body.tools=tools.map(t=>({type:'function',function:t}));
+  const h={'Content-Type':'application/json'};if(a.apiKey)h.Authorization='Bearer '+a.apiKey;
+  const j=await fetchJ(base+'/chat/completions',{method:'POST',headers:h,body:JSON.stringify(body)});const msg=j.choices?.[0]?.message||{};
+  return{text:msg.content||'',toolCalls:(msg.tool_calls||[]).map(t=>({id:t.id,name:t.function.name,args:safeJSON(t.function.arguments)}))}}
+
+/* ========== 검색 API ========== */
+const SEARCH={wikipedia:{name:'Wikipedia (키 불필요)'},tavily:{name:'Tavily',key:1},serper:{name:'Serper (Google)',key:1},brave:{name:'Brave Search',key:1},searxng:{name:'SearXNG (자체 호스팅)',url:1},custom:{name:'사용자 정의 URL',url:1,key:1}};
+const strip=s=>String(s||'').replace(/<[^>]+>/g,'');
+async function webSearch(q){const s=S.settings.search,k=s.keys[s.provider]||'',eq=encodeURIComponent(q),L=s.lang||'ko';
+  switch(s.provider){
+  case 'wikipedia':{const j=await fetchJ(`https://${L}.wikipedia.org/w/api.php?action=query&list=search&srsearch=${eq}&format=json&origin=*&srlimit=5`);return j.query.search.map(r=>({title:r.title,url:`https://${L}.wikipedia.org/wiki/${encodeURIComponent(r.title)}`,snippet:strip(r.snippet)}))}
+  case 'tavily':{const j=await fetchJ('https://api.tavily.com/search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({api_key:k,query:q,max_results:5})});return j.results.map(r=>({title:r.title,url:r.url,snippet:r.content}))}
+  case 'serper':{const j=await fetchJ('https://google.serper.dev/search',{method:'POST',headers:{'Content-Type':'application/json','X-API-KEY':k},body:JSON.stringify({q,hl:L})});return(j.organic||[]).slice(0,5).map(r=>({title:r.title,url:r.link,snippet:r.snippet}))}
+  case 'brave':{const j=await fetchJ(`https://api.search.brave.com/res/v1/web/search?q=${eq}&count=5`,{headers:{Accept:'application/json','X-Subscription-Token':k}});return(j.web?.results||[]).map(r=>({title:r.title,url:r.url,snippet:strip(r.description)}))}
+  case 'searxng':{const j=await fetchJ(s.url.replace(/\/$/,'')+`/search?q=${eq}&format=json`);return(j.results||[]).slice(0,5).map(r=>({title:r.title,url:r.url,snippet:r.content}))}
+  default:{if(!s.url)throw new Error('검색 URL을 입력하세요');const j=await fetchJ(s.url.replace('{q}',eq).replace('{key}',encodeURIComponent(k)));const a=Array.isArray(j)?j:(j.results||j.items||j.organic||[]);
+    return a.slice(0,5).map(r=>({title:r.title||r.name||'',url:r.url||r.link||'',snippet:r.snippet||r.content||r.description||''}))}}}
+
+/* ========== MCP (Streamable HTTP) ========== */
+let RPCID=1;
+async function mcpRPC(s,method,params,notify=false){const h={'Content-Type':'application/json',Accept:'application/json, text/event-stream',...safeJSON(s.headers)};if(s.sid)h['Mcp-Session-Id']=s.sid;
+  const id=RPCID++,body={jsonrpc:'2.0',method,...(params?{params}:{}),...(notify?{}:{id})};let r;
+  try{r=await fetch(s.url,{method:'POST',headers:h,body:JSON.stringify(body)})}catch{throw new Error('MCP 연결 실패 — URL과 CORS 허용 여부를 확인하세요')}
+  const sid=r.headers.get('mcp-session-id');if(sid)s.sid=sid;if(!r.ok)throw new Error('MCP HTTP '+r.status);if(notify)return null;
+  const ct=r.headers.get('content-type')||'',t=await r.text();let msg;
+  if(ct.includes('event-stream')){for(const line of t.split('\n'))if(line.startsWith('data:')){const d=safeJSON(line.slice(5).trim());if(d.id===id){msg=d;break}}}else msg=safeJSON(t);
+  if(!msg||(!msg.result&&!msg.error))throw new Error('MCP 응답을 해석할 수 없어요');if(msg.error)throw new Error('MCP: '+(msg.error.message||JSON.stringify(msg.error)));return msg.result}
+async function mcpConnect(s){s.sid=null;await mcpRPC(s,'initialize',{protocolVersion:'2025-03-26',capabilities:{},clientInfo:{name:'MemoryAll',version:'1.0'}});
+  await mcpRPC(s,'notifications/initialized',null,true).catch(()=>{});const r=await mcpRPC(s,'tools/list',{});
+  s.tools=(r.tools||[]).map(t=>({name:t.name,description:t.description||'',inputSchema:{type:'object',properties:{},...(t.inputSchema||{})}}));s.ok=true;save();return s.tools}
+async function mcpCall(s,name,args){const run=()=>mcpRPC(s,'tools/call',{name,arguments:args||{}});let r;try{r=await run()}catch{await mcpConnect(s);r=await run()}
+  return(r.content||[]).map(c=>c.type==='text'?c.text:JSON.stringify(c)).join('\n')||JSON.stringify(r)}
+
+/* ========== 에이전트 (도구 호출 루프) ========== */
+function agentTools(){const T=[],H={};
+  T.push({name:'web_search',description:'웹에서 사실이나 최신 정보를 검색한다',parameters:{type:'object',properties:{query:{type:'string'}},required:['query']}});
+  H.web_search=async a=>JSON.stringify(await webSearch(a.query));
+  T.push({name:'add_cards',description:'사용자의 MemoryAll 덱에 암기 카드를 추가한다. 빈칸 카드는 front 안의 정답을 {{정답}}으로 감싼다',parameters:{type:'object',properties:{deck:{type:'string',description:'덱 이름 (없으면 새로 만든다)'},cards:{type:'array',items:{type:'object',properties:{front:{type:'string'},back:{type:'string'},hint:{type:'string'}},required:['front']}}},required:['deck','cards']}});
+  H.add_cards=async a=>{const d=ensureDeck(a.deck);let n=0;for(const c of a.cards||[])if(c.front){S.cards.push(newCard(d.id,c.front,c.back||'',c.hint||''));n++}save();return `${d.name} 덱에 ${n}장 추가함`};
+  T.push({name:'get_weak_cards',description:'사용자가 자주 틀린 카드 목록을 가져온다',parameters:{type:'object',properties:{limit:{type:'number'}}}});
+  H.get_weak_cards=async a=>JSON.stringify(S.cards.filter(c=>c.lapses).sort((x,y)=>y.lapses-x.lapses).slice(0,a.limit||10).map(c=>({front:c.front,back:c.back,lapses:c.lapses,deck:deckById(c.deckId)?.name})));
+  S.settings.mcp.forEach((s,i)=>{if(!s.enabled)return;(s.tools||[]).forEach(t=>{const n=('mcp'+i+'_'+t.name).replace(/[^a-zA-Z0-9_-]/g,'_').slice(0,64);
+    T.push({name:n,description:`[${s.name}] ${t.description}`.slice(0,1000),parameters:t.inputSchema});H[n]=a=>mcpCall(s,t.name,a)})});
+  return{T,H}}
+async function runAgent(msgs,onStep,useTools=true){const{T,H}=useTools?agentTools():{T:[],H:{}};
+  for(let i=0;i<8;i++){const r=await callLLM(msgs,T);
+    if(!r.toolCalls.length){msgs.push({role:'assistant',content:r.text});return r.text}
+    msgs.push({role:'assistant',content:r.text,tool_calls:r.toolCalls});
+    for(const tc of r.toolCalls){onStep?.(tc);let out;try{out=H[tc.name]?await H[tc.name](tc.args):'알 수 없는 도구'}catch(e){out='오류: '+e.message}
+      msgs.push({role:'tool',tool_call_id:tc.id,content:trunc(out,8000)})}}
+  return '(도구 호출 횟수 한도에 도달했어요)'}
+
+/* ========== AI 카드 생성 ========== */
+const GEN={src:'',count:15,type:'mixed',web:false,deck:'',newDeck:'',extra:'',items:[],busy:false};
+function vAI(m){m.innerHTML=`<div class="head"><div><h1>AI 카드 생성</h1><div class="sub">교재, 필기, 기사를 붙여 넣거나 주제만 입력하면 암기 카드를 만들어 줘요</div></div></div>
+  <div class="grid g2" style="align-items:start">
+  <div class="card"><label class="f" style="margin-top:0">자료 또는 주제</label><textarea id="gSrc" style="min-height:220px" placeholder="예: 조선 전기 주요 왕과 업적&#10;또는 공부할 텍스트를 그대로 붙여 넣으세요">${esc(GEN.src)}</textarea>
+    <div class="row" style="margin-top:8px"><label class="btn sm">텍스트 파일 열기<input type="file" accept=".txt,.md,.csv" hidden onchange="genFile(this)"></label><label class="chk"><input type="checkbox" id="gWeb" ${GEN.web?'checked':''}> 웹 검색으로 보강</label></div>
+    <div class="row" style="flex-wrap:nowrap"><div style="flex:1"><label class="f">개수</label><input id="gCnt" type="number" min="1" max="100" value="${GEN.count}"></div>
+    <div style="flex:1"><label class="f">유형</label><select id="gType">${[['mixed','섞어서'],['basic','질문/답'],['cloze','빈칸'],['vocab','단어장']].map(([k,v])=>`<option value="${k}" ${GEN.type===k?'selected':''}>${v}</option>`).join('')}</select></div></div>
+    <label class="f">추가 요청 (선택)</label><input id="gExtra" value="${esc(GEN.extra)}" placeholder="예: 시험에 잘 나오는 것 위주로, 영어로">
+    <button class="btn pri" style="margin-top:16px;width:100%;justify-content:center" onclick="genCards()" ${GEN.busy?'disabled':''}>${GEN.busy?'생성 중...':'카드 생성'}</button></div>
+  <div class="card"><b>결과</b>${GEN.items.length?`<div style="max-height:430px;overflow:auto;margin-top:6px">${GEN.items.map((x,i)=>`<label class="gen ${x.on?'':'off'}"><input type="checkbox" ${x.on?'checked':''} onchange="GEN.items[${i}].on=this.checked;this.parentElement.classList.toggle('off',!this.checked)"><div><div style="font-weight:600">${isCloze(x)?clozeA(x.front):nl(x.front)}</div><div class="sub">${nl(x.back)}</div></div></label>`).join('')}</div>
+    <label class="f">저장할 덱</label><select id="gDeck"><option value="">+ 새 덱 만들기</option>${S.decks.map(d=>`<option value="${d.id}" ${GEN.deck===d.id?'selected':''}>${esc(d.name)}</option>`).join('')}</select>
+    <input id="gNew" style="margin-top:8px;${GEN.deck?'display:none':''}" placeholder="새 덱 이름" value="${esc(GEN.newDeck)}">
+    <button class="btn pri" style="margin-top:14px;width:100%;justify-content:center" onclick="saveGen()">선택한 카드 저장</button>`:'<div class="empty">생성된 카드가 여기에 표시돼요</div>'}</div></div>`;
+  $('#gSrc').oninput=e=>GEN.src=e.target.value;$('#gWeb').onchange=e=>GEN.web=e.target.checked;$('#gCnt').oninput=e=>GEN.count=+e.target.value||10;$('#gType').onchange=e=>GEN.type=e.target.value;$('#gExtra').oninput=e=>GEN.extra=e.target.value;
+  if($('#gDeck')){$('#gDeck').onchange=e=>{GEN.deck=e.target.value;$('#gNew').style.display=GEN.deck?'none':''};$('#gNew').oninput=e=>GEN.newDeck=e.target.value}}
+function genFile(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{GEN.src=r.result;$('#gSrc').value=r.result};r.readAsText(f)}
+async function genCards(){const src=GEN.src.trim();if(!src)return toast('자료나 주제를 입력하세요');GEN.busy=true;render();
+  try{let ctx='';if(GEN.web){try{const r=await webSearch(src.slice(0,100));ctx='\n\n[웹 검색 참고 자료]\n'+r.map(x=>`- ${x.title}: ${x.snippet} (${x.url})`).join('\n')}catch(e){toast('검색 실패: '+e.message)}}
+    const typ={mixed:'질문/답 카드와 빈칸 카드를 적절히 섞어서',basic:'질문/답 카드로',cloze:'빈칸 카드로 (front 안의 핵심어를 {{정답}}으로 감싸고, back은 보충 설명이나 빈 문자열)',vocab:'단어장 카드로 (front=단어, back=뜻과 짧은 예문)'}[GEN.type];
+    const r=await callLLM([{role:'system',content:'너는 최고의 플래시카드 제작자다. 최소 정보 원칙: 카드 하나에 사실 하나, 모호하지 않은 질문, 짧은 정답. 반드시 JSON 배열만 출력한다.'},
+      {role:'user',content:`다음 자료로 암기 카드 ${GEN.count}장을 ${typ} 만들어줘. ${GEN.extra}\n형식: [{"front":"...","back":"...","hint":"..."}] (hint는 선택)\n별도 요청이 없으면 자료와 같은 언어로 작성해.\n\n[자료]\n${src.slice(0,30000)}${ctx}`}]);
+    const t=r.text,arr=JSON.parse(t.slice(t.indexOf('['),t.lastIndexOf(']')+1));
+    GEN.items=arr.filter(x=>x&&x.front).map(x=>({front:String(x.front),back:String(x.back||''),hint:String(x.hint||''),on:true}));
+    if(!GEN.newDeck)GEN.newDeck=trunc(src.split('\n')[0],30);toast(`${GEN.items.length}장을 만들었어요`)}
+  catch(e){toast(e instanceof SyntaxError?'AI 응답을 해석하지 못했어요. 다시 시도해 주세요':e.message)}GEN.busy=false;render()}
+function saveGen(){const sel=GEN.items.filter(x=>x.on);if(!sel.length)return toast('선택된 카드가 없어요');
+  const d=GEN.deck?deckById(GEN.deck):ensureDeck(GEN.newDeck||'AI 생성 덱');sel.forEach(x=>S.cards.push(newCard(d.id,x.front,x.back,x.hint)));save();GEN.items=[];toast(`${d.name} 덱에 ${sel.length}장 저장했어요`);go('deck',d.id)}
+
+/* ========== AI 튜터 ========== */
+const TUTOR={msgs:[],api:[],draft:'',busy:false,tools:true};
+function tutorSys(){return{role:'system',content:`너는 MemoryAll의 친절한 AI 학습 튜터다. 개념을 쉽게 설명하고, 암기법(연상, 두문자, 이야기, 기억 궁전)을 제안하고, 퀴즈를 내고 채점한다. 사용자가 원하면 add_cards 도구로 카드를 만들고, 사실 확인이나 최신 정보가 필요하면 web_search를 쓴다. 간결하게, 사용자의 언어로 답한다.\n사용자 덱: ${S.decks.map(d=>`${d.name}(${deckCounts(d.id).total}장)`).join(', ')||'없음'}`}}
+function vTutor(m){const chips=['내가 자주 틀린 카드로 퀴즈 내줘','기억 궁전 기법 알려줘','영어 불규칙 동사 카드 20장 만들어줘','시험 2주 전 암기 계획 세워줘'];
+  const body=TUTOR.msgs.map(x=>x.role==='user'?`<div class="msg u">${esc(x.content)}</div>`:x.role==='assistant'?`<div class="msg a">${md(x.content)}</div>`:`<div class="msg t">${esc(x.content)}</div>`).join('');
+  m.innerHTML=`<div class="head"><div><h1>AI 튜터</h1><div class="sub">설명, 퀴즈, 암기법, 카드 생성 · 웹 검색과 MCP 도구 사용</div></div><div class="row"><label class="chk"><input type="checkbox" id="tTools" ${TUTOR.tools?'checked':''}> 도구 사용</label><button class="btn sm" onclick="TUTOR.msgs=[];TUTOR.api=[];render()">새 대화</button></div></div>
+  <div class="chat"><div class="msgs" id="msgs">${body||`<div class="empty">무엇이든 물어보세요<div style="margin-top:14px">${chips.map(c=>`<button class="chip" onclick="sendTutor(this.textContent)">${c}</button>`).join('')}</div></div>`}${TUTOR.busy?'<div class="msg t">생각 중...</div>':''}</div>
+  <div class="row" style="flex-wrap:nowrap;align-items:flex-end"><textarea id="tIn" style="min-height:52px;max-height:160px" placeholder="메시지 입력 (Enter 전송 · Shift+Enter 줄바꿈)">${esc(TUTOR.draft)}</textarea><button class="btn pri" style="height:52px" onclick="sendTutor()" ${TUTOR.busy?'disabled':''}>전송</button></div></div>`;
+  const mm=$('#msgs');mm.scrollTop=mm.scrollHeight;const ti=$('#tIn');ti.oninput=()=>TUTOR.draft=ti.value;
+  ti.onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();sendTutor()}};$('#tTools').onchange=e=>TUTOR.tools=e.target.checked;if(!TUTOR.busy)ti.focus()}
+async function sendTutor(text){text=(text||TUTOR.draft).trim();if(!text||TUTOR.busy)return;TUTOR.draft='';TUTOR.msgs.push({role:'user',content:text});TUTOR.busy=true;render();
+  const arr=[tutorSys(),...TUTOR.api,{role:'user',content:text}];
+  try{const out=await runAgent(arr,tc=>{TUTOR.msgs.push({role:'step',content:`도구 사용 · ${tc.name} ${trunc(JSON.stringify(tc.args),80)}`});if(VIEW==='tutor')render()},TUTOR.tools);
+    TUTOR.api=arr.slice(1);TUTOR.msgs.push({role:'assistant',content:out})}
+  catch(e){TUTOR.msgs.push({role:'step',content:'오류: '+e.message})}
+  TUTOR.busy=false;if(VIEW==='tutor')render();else{toast('튜터가 답변했어요');$('#dueBadge').textContent=buildQueue(null).length||''}}
+
+/* ========== 통계 ========== */
+function barChart(data,color){const mx=Math.max(1,...data.map(d=>d.v));return `<div class="bars">${data.map(d=>`<div class="bar"><div class="v">${d.v||''}</div><div class="bw"><i style="height:${d.v/mx*100}%;background:${color}"></i></div><div class="lb">${d.l}</div></div>`).join('')}</div>`}
+function vStats(m){const days=[...Array(14)].map((_,i)=>{const d=new Date();d.setDate(d.getDate()-13+i);return{l:(d.getMonth()+1)+'/'+d.getDate(),v:S.logs[dayKey(d)]?.r||0}});
+  const t0=new Date();t0.setHours(0,0,0,0);const fc=[...Array(14)].map((_,i)=>{const a=+t0+i*DAY,b=a+DAY;return{l:i?'+'+i:'오늘',v:S.cards.filter(c=>c.seen&&c.due<b&&(i===0||c.due>=a)).length}});
+  const nw=S.cards.filter(c=>!c.seen).length,mat=S.cards.filter(c=>c.seen&&c.interval>=21).length,lr=S.cards.length-nw-mat,tot=Math.max(1,S.cards.length);
+  const L=Object.values(S.logs),R=L.reduce((a,l)=>a+l.r,0),C=L.reduce((a,l)=>a+l.c,0);
+  const weak=S.cards.filter(c=>c.lapses).sort((a,b)=>b.lapses-a.lapses).slice(0,10);
+  m.innerHTML=`<div class="head"><div><h1>통계</h1><div class="sub">학습 흐름과 기억 상태를 한눈에</div></div></div>
+  <div class="grid g4">${stat('전체 카드',S.cards.length,'장')}${stat('총 복습',R,'회')}${stat('정답률',R?Math.round(C/R*100):0,'%')}${stat('학습한 날',L.filter(l=>l.r).length,'일')}</div>
+  <div class="grid g2" style="margin-top:14px"><div class="card"><b>최근 14일 복습</b>${barChart(days,'#818cf8')}</div><div class="card"><b>앞으로 14일 복습 예정</b>${barChart(fc,'#34d399')}</div></div>
+  <div class="card" style="margin-top:14px"><b>카드 상태</b><div class="stack"><i style="width:${nw/tot*100}%;background:#93c5fd"></i><i style="width:${lr/tot*100}%;background:#fbbf24"></i><i style="width:${mat/tot*100}%;background:#34d399"></i></div>
+    <div class="row sub" style="margin:0;gap:18px"><span>● 새 카드 ${nw}</span><span>● 학습 중 ${lr}</span><span>● 숙달 (21일 이상) ${mat}</span></div>
+    <div style="margin-top:20px;overflow-x:auto"><b>1년 학습 기록</b><div style="margin-top:10px">${heatmap(52)}</div></div></div>
+  <div class="card" style="margin-top:14px"><b>자주 틀린 카드</b>${weak.length?`<table style="margin-top:8px"><thead><tr><th>앞면</th><th>정답</th><th>틀린 횟수</th><th></th></tr></thead><tbody>${weak.map(c=>`<tr><td>${esc(trunc(c.front,70))}</td><td>${esc(trunc(answerText(c),60))}</td><td><span class="pill red">${c.lapses}</span></td><td style="text-align:right"><button class="btn sm ghost" onclick="editCard('${c.id}')">편집</button></td></tr>`).join('')}</tbody></table>`:'<div class="empty">아직 없어요</div>'}</div>`}
+
+/* ========== 설정 ========== */
+function vSettings(m){const a=S.settings.ai,p=PRESETS[a.provider]||PRESETS.custom,pr=a.profiles[a.provider]||{},s=S.settings.search,sp=SEARCH[s.provider]||{},loc=['ollama','lmstudio'].includes(a.provider);
+  m.innerHTML=`<div class="head"><div><h1>설정</h1><div class="sub">모든 키와 데이터는 이 브라우저(localStorage)에만 저장돼요</div></div></div>
+  <div class="grid g2" style="align-items:start">
+  <div class="card"><h2>AI API</h2><div class="sub">OpenAI 호환 API면 무엇이든 연결돼요 (Ollama, LM Studio 같은 로컬 모델 포함)</div>
+    <label class="f">제공자</label><select id="aP">${Object.entries(PRESETS).map(([k,v])=>`<option value="${k}" ${k===a.provider?'selected':''}>${v.name}</option>`).join('')}</select>
+    <label class="f">Base URL</label><input id="aU" value="${esc(pr.baseUrl??p.baseUrl)}" placeholder="https://.../v1">
+    <label class="f">API Key</label><div class="row" style="flex-wrap:nowrap"><input id="aK" type="password" value="${esc(pr.apiKey||'')}" placeholder="${loc?'로컬은 비워도 돼요':'키 입력'}"><button class="btn sm" onclick="togglePw('aK')">보기</button></div>
+    <label class="f">모델</label><input id="aM" value="${esc(pr.model||p.model)}">
+    ${loc?'<div class="sub" style="margin-top:10px">Ollama는 <code>OLLAMA_ORIGINS=*</code> 로 실행하고, LM Studio는 서버 설정에서 CORS를 켜 주세요.</div>':''}
+    <div class="row" style="margin-top:14px"><button class="btn pri" onclick="saveAI()">저장</button><button class="btn" onclick="testAI()">연결 테스트</button></div></div>
+  <div class="card"><h2>검색 API</h2><div class="sub">AI 카드 생성과 튜터가 사실을 확인할 때 사용해요</div>
+    <label class="f">검색 제공자</label><select id="sP">${Object.entries(SEARCH).map(([k,v])=>`<option value="${k}" ${k===s.provider?'selected':''}>${v.name}</option>`).join('')}</select>
+    ${sp.key?`<label class="f">API Key</label><div class="row" style="flex-wrap:nowrap"><input id="sK" type="password" value="${esc(s.keys[s.provider]||'')}"><button class="btn sm" onclick="togglePw('sK')">보기</button></div>`:''}
+    ${sp.url?`<label class="f">URL</label><input id="sU" value="${esc(s.url)}" placeholder="${s.provider==='searxng'?'http://localhost:8080':'https://api.example.com/search?q={q}&key={key}'}">`:''}
+    <label class="f">언어</label><input id="sL" value="${esc(s.lang)}" placeholder="ko, en ...">
+    ${s.provider==='brave'?'<div class="sub" style="margin-top:10px">Brave는 브라우저 CORS를 막을 수 있어요. 안 되면 Tavily나 Serper를 쓰세요.</div>':''}
+    <div class="row" style="margin-top:14px"><button class="btn pri" onclick="saveSearch()">저장</button><button class="btn" onclick="testSearch()">검색 테스트</button></div></div>
+  <div class="card"><h2>MCP 서버</h2><div class="sub">Streamable HTTP 방식의 MCP 서버 도구를 AI 튜터가 사용할 수 있어요</div>
+    ${S.settings.mcp.map((x,i)=>`<div class="list-item"><div style="min-width:0"><div style="font-weight:600">${esc(x.name)} ${x.ok?`<span class="pill green">도구 ${x.tools.length}개</span>`:'<span class="pill">미연결</span>'}</div><div class="sub" style="word-break:break-all">${esc(x.url)}</div></div>
+      <div class="row" style="flex-wrap:nowrap"><label class="chk"><input type="checkbox" ${x.enabled?'checked':''} onchange="S.settings.mcp[${i}].enabled=this.checked;save()">사용</label><button class="btn sm" onclick="connectMCP(${i})">연결</button><button class="btn sm ghost danger" onclick="delMCP(${i})">삭제</button></div></div>`).join('')||'<div class="empty" style="padding:16px">등록된 서버가 없어요</div>'}
+    <label class="f">이름</label><input id="mN" placeholder="예: Notion">
+    <label class="f">URL</label><input id="mU" placeholder="http://localhost:3000/mcp">
+    <label class="f">헤더 (JSON, 선택)</label><input id="mH" placeholder='{"Authorization":"Bearer ..."}'>
+    <button class="btn pri" style="margin-top:14px" onclick="addMCP()">추가하고 연결</button></div>
+  <div class="card"><h2>학습</h2>
+    <div class="row" style="flex-wrap:nowrap"><div style="flex:1"><label class="f">하루 새 카드 수</label><input id="lN" type="number" min="0" value="${S.settings.newPerDay}"></div><div style="flex:1"><label class="f">일일 복습 목표</label><input id="lG" type="number" min="1" value="${S.settings.goal}"></div></div>
+    <label class="f">음성(TTS) 언어</label><select id="lT">${[['ko-KR','한국어'],['en-US','영어'],['ja-JP','일본어'],['zh-CN','중국어'],['es-ES','스페인어'],['fr-FR','프랑스어'],['de-DE','독일어']].map(([k,v])=>`<option value="${k}" ${S.settings.ttsLang===k?'selected':''}>${v}</option>`).join('')}</select>
+    <button class="btn pri" style="margin-top:14px" onclick="saveLearn()">저장</button>
+    <h2 style="margin-top:26px">데이터</h2><div class="sub">API 키를 포함한 모든 데이터를 파일로 백업해요</div>
+    <div class="row" style="margin-top:12px"><button class="btn" onclick="download('memoryall-backup-'+dayKey()+'.json',JSON.stringify(S))">백업 내보내기</button><label class="btn">백업 불러오기<input type="file" accept=".json" hidden onchange="restore(this)"></label><button class="btn danger" onclick="resetAll()">전체 초기화</button></div></div>
+  </div>`;
+  $('#aP').onchange=e=>{saveAI(true);a.provider=e.target.value;save();render()};
+  $('#sP').onchange=e=>{saveSearch(true);s.provider=e.target.value;save();render()}}
+function saveAI(q){const a=S.settings.ai;a.profiles[a.provider]={baseUrl:$('#aU').value.trim(),apiKey:$('#aK').value.trim(),model:$('#aM').value.trim()};save();if(q!==true)toast('AI 설정을 저장했어요')}
+async function testAI(){saveAI(true);toast('테스트 중...');try{const r=await callLLM([{role:'user',content:'"연결 성공"이라고만 답해.'}]);toast('응답: '+trunc(r.text,60))}catch(e){toast(e.message)}}
+function saveSearch(q){const s=S.settings.search;if($('#sK'))s.keys[s.provider]=$('#sK').value.trim();if($('#sU'))s.url=$('#sU').value.trim();s.lang=$('#sL').value.trim()||'ko';save();if(q!==true)toast('검색 설정을 저장했어요')}
+async function testSearch(){saveSearch(true);toast('검색 중...');try{const r=await webSearch('기억');toast(`${r.length}건 · ${trunc(r[0]?.title||'',40)}`)}catch(e){toast(e.message)}}
+async function connectMCP(i){const s=S.settings.mcp[i];toast('연결 중...');try{const t=await mcpConnect(s);toast(`${s.name}: 도구 ${t.length}개`)}catch(e){s.ok=false;save();toast(e.message)}if(VIEW==='settings')render()}
+function addMCP(){const name=$('#mN').value.trim(),url=$('#mU').value.trim(),headers=$('#mH').value.trim();if(!url)return toast('URL을 입력하세요');
+  if(headers){try{JSON.parse(headers)}catch{return toast('헤더는 올바른 JSON이어야 해요')}}
+  S.settings.mcp.push({id:uid(),name:name||'MCP 서버',url,headers,enabled:true,tools:[],ok:false});save();connectMCP(S.settings.mcp.length-1)}
+function delMCP(i){if(!confirm('이 MCP 서버를 삭제할까요?'))return;S.settings.mcp.splice(i,1);save();render()}
+function saveLearn(){S.settings.newPerDay=Math.max(0,+$('#lN').value||0);S.settings.goal=Math.max(1,+$('#lG').value||1);S.settings.ttsLang=$('#lT').value;save();toast('저장했어요');render()}
+function restore(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!Array.isArray(d.cards))throw 0;S=merge(structuredClone(DEF),d);save();toast('백업을 불러왔어요');render()}catch{toast('올바른 백업 파일이 아니에요')}};r.readAsText(f)}
+function resetAll(){if(!confirm('모든 덱, 카드, 기록, 설정을 삭제할까요? 되돌릴 수 없어요.'))return;localStorage.removeItem('memoryall');S=seed();save();ST=null;go('home')}
+
+/* ========== 뽀모도로 ========== */
+const PM={focus:true,left:1500,run:false,t:null};
+function pmDraw(){$('#pmT').textContent=String(Math.floor(PM.left/60)).padStart(2,'0')+':'+String(PM.left%60).padStart(2,'0');$('#pmM').textContent=PM.focus?'집중':'휴식';$('#pmB').textContent=PM.run?'일시정지':'시작'}
+function pmToggle(){PM.run=!PM.run;clearInterval(PM.t);
+  if(PM.run){if('Notification'in window&&Notification.permission==='default')Notification.requestPermission();
+    PM.t=setInterval(()=>{if(--PM.left<=0){PM.focus=!PM.focus;PM.left=PM.focus?1500:300;const msg=PM.focus?'휴식 끝! 다시 집중해요':'집중 완료! 5분 쉬어요';toast(msg);try{new Notification('MemoryAll',{body:msg})}catch{}}pmDraw()},1000)}pmDraw()}
+function pmReset(){clearInterval(PM.t);Object.assign(PM,{run:false,focus:true,left:1500});pmDraw()}
+
+/* ========== 시작 ========== */
+$('#modal').onclick=e=>{if(e.target.id==='modal')closeModal()};
+setInterval(()=>{const b=$('#dueBadge');if(b)b.textContent=buildQueue(null).length||''},60000);
+render();pmDraw();
+</script>
+</body>
+</html>
