@@ -16,9 +16,11 @@
 <script>
 /* 앱 아이콘·매니페스트를 파일 없이 코드로 생성 (단일 파일 구조) */
 (function(){
+  try{ // 캔버스 미지원/실패 환경에서도 앱 전체가 죽지 않도록 격리
   function makeIcon(size){
     const c=document.createElement('canvas');c.width=c.height=size;
-    const x=c.getContext('2d'),r=size*0.22,g=x.createLinearGradient(0,0,size,size);
+    const x=c.getContext&&c.getContext('2d');if(!x)throw new Error('no canvas ctx');
+    const r=size*0.22,g=x.createLinearGradient(0,0,size,size);
     g.addColorStop(0,'#6366f1');g.addColorStop(1,'#8b5cf6');
     x.fillStyle=g;x.beginPath();x.moveTo(r,0);
     x.arcTo(size,0,size,size,r);x.arcTo(size,size,0,size,r);x.arcTo(0,size,0,0,r);x.arcTo(0,0,size,0,r);
@@ -35,7 +37,9 @@
     background_color:'#f6f7f9',theme_color:'#ffffff',
     icons:[{src:i192,sizes:'192x192',type:'image/png'},{src:i512,sizes:'512x512',type:'image/png'}]};
   document.getElementById('manifestLink').href='data:application/manifest+json,'+encodeURIComponent(JSON.stringify(mf));
+  }catch(e){/* 아이콘 생성 실패 시에도 앱은 정상 동작 */}
 })();
+// jsdom 등 캔버스 미지원 환경의 스크립트 실행을 막지 않도록, window에 테스트/진단용 훅 노출
 </script>
 <style>
 /* 1. 디자인 토큰 */
@@ -222,7 +226,7 @@ const safeUrl=u=>{const s=String(u||'').trim();if(/^https?:\/\//i.test(s))return
 const dayKey=(t=Date.now())=>{const d=new Date(t);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
 const startOfDay=(t=Date.now())=>{const d=new Date(t);d.setHours(0,0,0,0);return d.getTime()};
 const shuffle=a=>{a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
-const isDesktop=()=>matchMedia('(min-width:821px)').matches;
+const isDesktop=()=>window.matchMedia?matchMedia('(min-width:821px)').matches:true;
 
 // 마지막에 뜬 토스트 (디버깅·테스트 훅)
 let LAST_TOAST='';
@@ -730,7 +734,12 @@ function drawStudy(){
 }
 function grade(g){
   if(!ST||!ST.show)return;
+  // 덱/카드 삭제(다른 탭 동기화·백업 복원 포함)로 현재 카드가 이미 존재하지 않으면
+  // 좀비 카드는 채점·대열에서 제거하고 다음 유효 카드로 넘어간다 (삭제된 덱의 카드 학습 방지)
+  {let guard=0;while(ST&&ST.i<ST.q.length&&!S.cards.some(c=>c.id===ST.q[ST.i])){ST.q.splice(ST.i,1);if(++guard>ST.q.length+5)break}}
+  if(!ST)return;
   const id=ST.q[ST.i],idx=S.cards.findIndex(c=>c.id===id);
+  if(idx<0){ST.i++;resetCardState();drawStudy();return}
   let ok=g>1;
   if(ST.mode==='quiz'&&ST.choices)ok=ST.picked!=null&&ST.choices[ST.picked]===ansText(curCard()||S.cards[idx]);
   else if(ST.mode==='type'&&ST.typed!=null)ok=!!ST.correct;
@@ -739,6 +748,9 @@ function grade(g){
     S.cards[idx]={...nextState(S.cards[idx],g),updated:Date.now()};logReview(ok,isNew);save();
     navigator.vibrate?.(g===1?[30,40,30]:15);
     if(g===1)ST.q.splice(Math.min(ST.q.length,ST.i+4),0,id); // 틀린 카드는 몇 장 뒤에 다시
+  }else{
+    // 카드가 이미 삭제된 상태(좀비 카드) — 채점·기록 없이 대열에서만 제거
+    ST.q.splice(ST.i,1);
   }
   ST.done++;ST.i++;resetCardState();drawStudy();
 }
@@ -1057,14 +1069,16 @@ const ACT={
     const d=S.decks.find(x=>x.id===id);if(!d)return;
     const n=S.cards.filter(c=>c.deck===id).length;
     if(!confirm(`'${d.name}' 덱과 카드 ${n}장을 삭제할까요?`))return;
-    S.decks=S.decks.filter(x=>x.id!==id);S.cards=S.cards.filter(c=>c.deck!==id);save();toast('삭제됨');go('#home');
+    S.decks=S.decks.filter(x=>x.id!==id);S.cards=S.cards.filter(c=>c.deck!==id);
+    if(ST){ST.q=ST.q.filter(qid=>S.cards.some(c=>c.id===qid));if(ST.deck===id)ST.deck=null} // 진행 중인 학습 대열에서도 즉시 제거
+    save();toast('삭제됨');go('#home');
   },
   openDeck:({id})=>go('#deck/'+id),
   addCard:({id})=>cardModal(null,id),
   editCard:({id})=>cardModal(id),
   editCur:()=>{const c=curCard();if(c)cardModal(c.id)},
   saveCard:({id})=>saveCard(id),
-  delCard:({id})=>{if(!confirm('이 카드를 삭제할까요?'))return;S.cards=S.cards.filter(c=>c.id!==id);save();rerender()},
+  delCard:({id})=>{if(!confirm('이 카드를 삭제할까요?'))return;S.cards=S.cards.filter(c=>c.id!==id);if(ST)ST.q=ST.q.filter(qid=>qid!==id);save();rerender()},
   import:({id})=>importModal(id),
   doImport:()=>doImport(),
   exportDeck:({id})=>{
@@ -1650,6 +1664,9 @@ load();
 pmLoad();pmDraw();
 $('#topSet').innerHTML=ic(I.gear);
 route();
+
+// 진단/자동화 도구용 훅 (UI·기능과 무관하게 내부 상태 읽기만 제공)
+window.__MA__={get S(){return S},get ST(){return ST},ACT,buildQueue,startStudy,grade,curCard,save,load,route};
 </script>
 </body>
 </html>
