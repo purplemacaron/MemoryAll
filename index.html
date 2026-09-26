@@ -244,8 +244,9 @@ function findArr(o,d=0){
 }
 function plainText(x){const t=document.createElement('textarea');t.innerHTML=String(x||'').replace(/<[^>]+>/g,' ');return t.value.replace(/\s+/g,' ').trim()}
 
-// 안전한 스킴만 통과 (javascript:, data: 등 차단) → md()와 소스 링크에서 사용
-const linkUrl=u=>{const s=safeUrl(u);return /^https?:\/\//i.test(s)?s:'#'};
+// 안전한 스킴만 통과 (javascript:, data:, file: 등 차단) → md()와 소스 링크에서 사용
+// 개행·공백·컨트롤문자로 위장한 'java\nscript:' 같은 변형도 원문 단계에서 걸러냄
+const linkUrl=u=>{const raw=String(u??'').replace(/[\u0000-\u0020\u007f]/g,'');if(/^javascript|^data|^vbscript|^file|^blob/i.test(raw))return '#';const s=safeUrl(u);return /^https?:\/\//i.test(s)?s:'#'};
 
 // 간단한 마크다운 (먼저 전부 escape → XSS 방지)
 function md(src){
@@ -364,6 +365,12 @@ function load(){
     if(typeof c.created!=='number')c.created=Date.now();
   }
   if(!d){seed();save()}
+  // log 항목도 형태 보정 (손상된 로그로 인한 통계 화면 오류 방지)
+  for(const k in S.log){const l=S.log[k];if(!l||typeof l!=='object'){delete S.log[k];continue}
+    l.n=+l.n||0;l.ok=+l.ok||0;l.nw=+l.nw||0;if(l.ok>l.n)l.ok=l.n;
+    if(l.hs!=null&&!Array.isArray(l.hs))delete l.hs;}
+  // 학습 기록이 전혀 없는 빈 데이터가 디스크에 남아 있으면 시드 복구 (홈·통계가 마냥 비어 보이는 문제 방지)
+  if(d&&S.decks.length===0&&S.cards.length===0&&!Object.keys(S.log).length){seed();save()}
   // 덱·카드 무결성: 카드의 덱이 실존하지 않으면 새 기본 덱을 만들어 편입 (고아 카드 유실 방지)
   let orphans=S.cards.filter(c=>!S.decks.some(x=>x.id===c.deck));
   if(orphans.length){
@@ -683,8 +690,10 @@ function drawStudy(){
   const deck=ST.deck&&S.decks.find(d=>d.id===ST.deck),title=deck?esc(deck.name):'전체 학습',back=deck?'#deck/'+encodeURIComponent(deck.id):'#home';
   const c=curCard();
   if(!c){
+    const doneN=ST.done; // 완료 장면을 먼저 계산한 뒤 학습 상태 정리 (좀비 ST로 인한 단축키·rerender 오류 방지)
+    ST=null;
     M(`<div class="head"><div class="row"><a class="icon-btn" href="${back}">${ic(I.back)}</a><h1>${title}</h1></div></div><div class="card empty">
-    ${ST.done?`<div class="bigic" style="background:#ecfdf5;color:var(--green)">${ic(I.check)}</div><h2 style="justify-content:center">학습 완료</h2><p>${ST.done}장을 복습했어요. 연속 ${streak()}일째!</p>`
+    ${doneN?`<div class="bigic" style="background:#ecfdf5;color:var(--green)">${ic(I.check)}</div><h2 style="justify-content:center">학습 완료</h2><p>${doneN}장을 복습했어요. 연속 ${streak()}일째!</p>`
     :`<div class="bigic" style="background:var(--accent-soft);color:var(--accent)">${ic(I.clock)}</div><h2 style="justify-content:center">지금 학습할 카드가 없어요</h2><p>새 카드를 추가하거나 AI로 만들어 보세요.</p>`}
     <div class="row" style="justify-content:center;margin-top:18px"><a class="btn" href="#home">홈으로</a><a class="btn pri" href="#gen">${ic(I.spark)}AI로 카드 만들기</a></div></div>`);
     return;
@@ -742,8 +751,10 @@ function pick(i){
 function checkType(){
   const el=$('#typeIn');if(!ST||ST.show||!el)return;
   const v=el.value.trim();if(!v)return toast('답을 입력하세요');
-  const norm=s=>String(s).toLowerCase().replace(/[\s.,!?'"()\-·~]/g,''),ans=ansText(curCard());
-  ST.typed=v;ST.correct=norm(ans)===norm(v)||ans.split(/[,/;\n]/).map(norm).filter(Boolean).includes(norm(v));
+  const c=curCard();if(!c)return; // 카드가 삭제된 뒤 확인 시도 방지
+  const norm=s=>String(s).toLowerCase().replace(/[\s.,!?'"()\-·~]/g,'').trim(),ans=ansText(c);
+  const nv=norm(v);
+  ST.typed=v;ST.correct=!!nv&&(norm(ans)===nv||ans.split(/[,/;\n]/).map(norm).filter(Boolean).includes(nv));
   ST.show=true;drawStudy();
 }
 async function mnemonic(){
@@ -777,11 +788,11 @@ function cardModal(id,deckId){
   const dk=c?c.deck:deckId||S.decks[0].id,t=c?.type||'basic';
   openModal(`<h2>${c?'카드 수정':'카드 추가'}${closeBtn()}</h2>
   <div class="two">${fld('덱',`<select id="cDeck">${S.decks.map(d=>`<option value="${esc(d.id)}" ${dk===d.id?'selected':''}>${esc(d.name)}</option>`).join('')}</select>`)}${fld('유형',`<select id="cType">${Object.entries(TYPES).map(([k,v])=>`<option value="${k}" ${t===k?'selected':''}>${v}</option>`).join('')}</select>`)}</div>
-  ${fld('앞면',`<textarea id="cFront" placeholder="질문, 단어 또는 문장">${esc(c?.front||'')}</textarea>`,'빈칸 카드는 정답을 {{정답}}처럼 감싸세요 · Ctrl+Enter 저장')}
+  ${fld('앞면',`<textarea id="cFront" placeholder="질문, 단어 또는 문장">${esc(c?.front||'')}</textarea>`,'빈칸 카드는 정답을 {{정답}}처럼 감싸세요 · Enter 저장 (Shift+Enter 줄바꿈)')}
   ${fld('뒷면',`<textarea id="cBack" placeholder="답 또는 뜻 (빈칸 카드는 보충 설명)">${esc(c?.back||'')}</textarea>`)}
   ${fld('힌트 · 예문',`<input id="cHint" value="${esc(c?.hint||'')}" placeholder="선택" autocomplete="off">`)}
   <div class="row" style="justify-content:flex-end"><button class="btn" data-act="close">닫기</button><button class="btn pri" data-act="saveCard" data-id="${esc(c?.id||'')}">${ic(I.check)}저장</button></div>`);
-  // Enter로 줄바꿈 대신 바로 저장 (Ctrl+Enter도 지원)
+  // Enter로 줄바꿈 대신 바로 저장 (Ctrl+Enter도 지원) — 백틱 이스케이프 버그로 이벤트가 안 걸리던 문제 수정
   $('#cFront').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();saveCard(c?.id||'')}});
   $('#cBack').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();saveCard(c?.id||'')}});
   setTimeout(()=>$('#cFront')?.focus(),50);
@@ -798,7 +809,7 @@ function saveCard(id){
 }
 function importModal(deckId){
   openModal(`<h2>카드 가져오기${closeBtn()}</h2>
-  ${fld('대상 덱',`<select id="imDeck">${S.decks.map(d=>`<option value="${esc(d.id)}" ${d.id===deckId?'selected':''}>${esc(d.name)}</option>`).join('')}<option value="__new" ${S.decks.length?'':'selected'}>+ 새 덱 만들기</option></select>`)}
+  ${S.decks.length?fld('대상 덱',`<select id="imDeck">${S.decks.map(d=>`<option value="${esc(d.id)}" ${d.id===deckId?'selected':''}>${esc(d.name)}</option>`).join('')}<option value="__new">+ 새 덱 만들기</option></select>`):''}
   ${fld('파일 (CSV · TXT · TSV)',`<input type="file" id="imFile" accept=".csv,.txt,.tsv,text/csv,text/plain" multiple>`)}
   ${fld('또는 직접 붙여넣기',`<textarea id="imText" style="min-height:140px" placeholder="앞면,뒷면,힌트&#10;apple,사과,I ate an apple.&#10;{{서울}}은 한국의 수도다."></textarea>`,'한 줄에 카드 하나 · 구분자(탭, |, 쉼표) 자동 인식 · {{ }}가 있으면 빈칸 카드')}
   <div class="row" style="justify-content:flex-end"><button class="btn" data-act="close">취소</button><button class="btn pri" data-act="doImport">${ic(I.upload)}가져오기</button></div>`);
@@ -822,8 +833,9 @@ function parseImport(t){
 }
 function doImport(){
   const rows=parseImport($('#imText').value);if(!rows.length)return toast('가져올 내용이 없습니다');
-  let dk=$('#imDeck').value;
-  if(dk==='__new'||!S.decks.some(d=>d.id===dk)){const d={id:uid(),name:'가져온 카드 '+dayKey(),created:Date.now()};S.decks.push(d);dk=d.id}
+  let dk=$('#imDeck')?$('#imDeck').value:''; // 덱이 없어 선택 상자가 없는 경우에도 안전하게
+  if(dk!=='__new'&&!S.decks.some(d=>d.id===dk))dk='';
+  if(!dk){const d={id:uid(),name:'가져온 카드 '+dayKey(),created:Date.now()};S.decks.push(d);dk=d.id}
   rows.forEach(r=>S.cards.push(newCard(dk,r.front,r.back,r.hint,r.type)));
   save();closeModal();toast(rows.length+'장을 가져왔어요');go('#deck/'+encodeURIComponent(dk));
 }
@@ -949,7 +961,8 @@ function vStats(){
   const W=['일','월','화','수','목','금','토'],noon=startOfDay()+DAY/2,sod=startOfDay(),today=dayKey();
   let n30=0,ok30=0;for(let i=0;i<30;i++){const l=S.log[dayKey(noon-i*DAY)];if(l){n30+=l.n;ok30+=l.ok}}
   const heat=[],d=new Date();d.setHours(12,0,0,0);d.setDate(d.getDate()-181);d.setDate(d.getDate()-d.getDay());
-  while(dayKey(d.getTime())<=today){const k=dayKey(d.getTime()),v=S.log[k]?.n||0;heat.push(`<i class="${v?'l'+(v<10?1:v<30?2:v<60?3:4):''}" title="${k}: ${v}장"></i>`);d.setDate(d.getDate()+1)}
+  let heatN=0;
+  while(dayKey(d.getTime())<=today&&heatN<400){const k=dayKey(d.getTime()),v=S.log[k]?.n||0;heat.push(`<i class="${v?'l'+(v<10?1:v<30?2:v<60?3:4):''}" title="${k}: ${v}장"></i>`);d.setDate(d.getDate()+1);heatN++}
   const past=[],fut=[];
   for(let i=6;i>=0;i--){const t=noon-i*DAY;past.push([i?W[new Date(t).getDay()]:'오늘',S.log[dayKey(t)]?.n||0])}
   for(let i=0;i<7;i++){const a=sod+i*DAY;fut.push([i?W[new Date(a+DAY/2).getDay()]:'오늘',S.cards.filter(c=>c.last&&(i===0||c.due>=a)&&c.due<a+DAY).length])}
@@ -1005,7 +1018,7 @@ function vSettings(){
     <div class="sub" style="margin-bottom:12px">백업 파일에는 카드, 학습 기록, 설정(API 키 포함)이 들어갑니다. 다른 사람에게 공유하지 마세요.</div>
     <div class="row"><button class="btn" data-act="exportAll">${ic(I.download)}백업 내보내기</button>
     <button class="btn" data-act="exportEnc">${ic(I.gear)}암호화 백업</button>
-    <label class="btn" style="margin:0">${ic(I.upload)}백업 복원<input type="file" id="bkFile" accept=".json,application/json,.bin" hidden></label>
+    <label class="btn" style="margin:0">${ic(I.upload)}백업 복원<input type="file" id="bkFile" accept=".json,.txt,.bin,application/json,text/plain" hidden></label>
     <button class="btn danger" data-act="resetAll">${ic(I.trash)}전체 초기화</button></div>
     <div class="two" style="margin-top:12px"><div class="field"><label>자동 백업 (이 브라우저)</label>
       <label class="toggle ${s.autoBk?.on?'on':''}" style="margin:0;height:42px;border-radius:10px"><input type="checkbox" id="abOn" class="chk" ${s.autoBk?.on?'checked':''}>${ic(I.clock)}주기적으로 자동 저장</label></div><div></div></div>
@@ -1157,6 +1170,9 @@ document.addEventListener('change',async e=>{
     const f=t.files[0];t.value='';if(!f)return;
     let txt='';try{txt=await f.text()}catch{return toast('파일을 읽을 수 없습니다')}
     if(txt.startsWith(ENC_MAGIC)){askPw(async pw=>{try{restoreBackup(safeJSON(await decryptText(pw,txt)))}catch{toast('복호화에 실패했습니다. 비밀번호를 확인하세요',4000)}});return}
+    let binErr=false;
+    try{if(/[\u0000-\u0008\u000e-\u001f]/.test(txt))binErr=true}catch{binErr=true} // UTF-8이 아닌 이진 파일(옛 .bin 백업 등)은 즉시 안내
+    if(binErr){toast('이진 파일을 읽을 수 없습니다. 텍스트(JSON) 백업을 선택하세요',4000);return}
     const d=detectImport(txt,f.name);
     if(d&&d.k==='json'&&Array.isArray(d.data)&&Array.isArray(d.data.cards)){restoreBackup(d.data);return}
     if(d&&d.k==='cards'){ // 카드 배열/CSV → 가져오기로 처리
@@ -1287,12 +1303,14 @@ function detectImport(text,name){
   if(hdr(0)&&back<0)back=1;if(hdr(0)&&type>=0&&type!==1)back=type===2?1:2;
   if(back<0)back=1;
   const clean=s=>String(s??'').replace(/^[#\/\/]+\s*/,'').trim();
-  const cards=[];
+  const cards=[],seen=new Set(); // 앞면+뒷면 완전 중복 제거 (같은 파일을 두 번 가져와도 카드가 늘지 않음)
   for(const r of rows){
     const f=clean(r[0]);if(!f)continue;
     if(hdr(rows.indexOf(r)))continue;
     let ty=['basic','cloze','vocab'].includes(type>-1?clean(r[type]):'')?(clean(r[type]).toLowerCase()==='cloze'?'cloze':clean(r[type]).toLowerCase()==='vocab'?'vocab':'basic'):(/\{\{.+?\}\}/.test(f)?'cloze':'basic');
-    cards.push({front:f,back:ty==='cloze'?'':clean(r[back]||''),hint:clean(hint>-1?r[hint]:(r[back+1]||'')),type:ty});
+    const bk=ty==='cloze'?'':clean(r[back]||''),hk=clean(hint>-1?r[hint]:(r[back+1]||''));
+    const key=f+'\u0000'+bk;if(seen.has(key))continue;seen.add(key);
+    cards.push({front:f,back:bk,hint:hk,type:ty});
   }
   return cards.length?{k:'cards',data:cards}:null;
 }
@@ -1371,13 +1389,9 @@ function askPw(onOk){
   $('#bkPwR').addEventListener('keydown',e=>{if(e.key==='Enter')go2()});
   setTimeout(()=>$('#bkPwR')?.focus(),50);
 }
-async function exportEnc(pw){
-  const salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12));
-  const key=await deriveKey(pw,salt);
-  const pt=new TextEncoder().encode(JSON.stringify(S));
-  const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},key,pt));
-  const blob=new Uint8Array(salt.length+iv.length+ct.length);blob.set(salt,0);blob.set(iv,16);blob.set(ct,28);
-  download(`memoryall-backup-${dayKey()}-encrypted.bin`,String.fromCharCode(...blob),'application/octet-stream');
+async function exportEnc(pw){ // 암호화 백업은 항상 텍스트(.txt)로 저장 → 복원 시 UTF-8로 안전하게 읽힘 (이진 깨짐 버그 수정)
+  const b64=await encryptText(pw,JSON.stringify(S));
+  download(`memoryall-backup-${dayKey()}-encrypted.txt`,b64,'text/plain');
   toast('암호화된 백업을 내보냈어요 (복원 시 같은 파일 선택 + 비밀번호)');
 }
 async function restoreBackup(d){ // JSON 백업 객체를 검증 후 복원
@@ -1538,9 +1552,16 @@ function mergeData(a,b){
   const cards=Object.create(null);[...(a?.cards||[]),...(b?.cards||[])].forEach(c=>{if(c&&c.id)cards[c.id]=cards[c.id]?pick(cards[c.id],c):c});
   const log=Object.create(null);
   for(const src of [a?.log,b?.log]){for(const k in (src||{})){const l=src[k]||{};const o=log[k];
-    if(!o){const cp={n:+l.n||0,ok:+l.ok||0,nw:+l.nw||0};if(Array.isArray(l.hs)){const hs=new Array(24).fill(0);l.hs.forEach(v=>{v|=0;if(v>=0&&v<24)hs[v]++});cp.hs=hs}log[k]=cp}
+    if(!o){const cp={n:+l.n||0,ok:+l.ok||0,nw:+l.nw||0};if(Array.isArray(l.hs)&&l.hs.length)cp.hs=l.hs.slice(-1000);log[k]=cp} // hs는 '시간 목록'(24개 초과 가능) 또는 '히스토그램'(≤24) → 원본 유지, 이후 병합에서 형식 판별
     else{o.n=Math.max(o.n,+l.n||0);o.ok=Math.max(o.ok,+l.ok||0);o.nw=Math.max(o.nw,+l.nw||0);
-      if(Array.isArray(l.hs)){const hs=o.hs||(o.hs=new Array(24).fill(0));l.hs.forEach(v=>{v|=0;if(v>=0&&v<24)hs[v]++})}}}}
+      if(Array.isArray(l.hs)&&l.hs.length){
+        if(!o.hs)o.hs=l.hs.slice(-1000);
+        else{
+          const histH=o.hs.length<=24&&l.hs.length<=24; // 둘 다 히스토그램 형태 → 인덱스 합산
+          if(histH){const n2=Math.min(24,Math.max(o.hs.length,l.hs.length));const merged=new Array(n2).fill(0);for(let x=0;x<n2;x++){merged[x]=(+o.hs[x]||0)+(+l.hs[x]||0)}o.hs=merged}
+          else{o.hs=o.hs.concat(l.hs).slice(-1000)} // 시간 목록 → 단순 연결
+        }}}
+  }}
   const settings=((a?.settings&&typeof a.settings==='object'?a.settings:b?.settings)||{});
   return {decks:Object.values(decks),cards:Object.values(cards),log,settings};
 }
@@ -1592,6 +1613,7 @@ window.addEventListener('drop',e=>{
 
 /* 초기화 보강 */
 (function initExt(){
+  if(!S)return; // load() 실패 시에는 확장 초기화를 건너뜀 (undefined 오류 방지)
   // 내 ID (병합 시 로컬 우선)
   if(!S.deviceId){S.deviceId=uid();try{localStorage.setItem(KEY,JSON.stringify(S))}catch{}}
   // 헤더·내비·탭바에 검색 버튼
