@@ -326,6 +326,7 @@ const I={
 
 /* ================= 3. 데이터 저장소 (localStorage 'memoryall') ================= */
 const KEY='memoryall';
+let delTomb={};
 const DEF_SETTINGS={newPerDay:20,ttsLang:'auto',mode:'flash',pmNotify:false,pmWork:25,pmBreak:5,
   ai:{provider:'openai',base:'https://api.openai.com/v1',model:'gpt-4o-mini',key:''},
   search:{provider:'wikipedia',key:'',url:'',lang:'ko'},mcp:[]};
@@ -352,11 +353,17 @@ function load(){
   const raw=localStorage.getItem(KEY),d=raw?safeJSON(raw):null;
   const def=JSON.parse(JSON.stringify(DEF_SETTINGS));
   S={decks:[],cards:[],log:{},...(d&&typeof d==='object'?d:{})};
+  delTomb=(d&&d.delTomb&&typeof d.delTomb==='object')?d.delTomb:{};
   const st=S.settings||{};
   S.settings={...def,...st,ai:{...def.ai,...(st.ai||{})},search:{...def.search,...(st.search||{})},mcp:Array.isArray(st.mcp)?st.mcp:[]};
   if(!Array.isArray(S.decks))S.decks=[];
   if(!Array.isArray(S.cards))S.cards=[];
   S.cards=S.cards.filter(c=>c&&c.id&&c.front!=null);
+  // 외딴(orphan) 카드: 존재하지 않는 덱을 가리키는 카드는 전체 학습에도 나타나지 않도록 제거
+  const deckIds=new Set(S.decks.map(d=>d.id));
+  S.cards=S.cards.filter(c=>deckIds.has(c.deck));
+  // 삭제 이력 적용: 한 번 삭제된 덱의 카드는 다시 나타나지 않는다 (백업/병합으로 되살아나는 버그 차단)
+  S.cards=S.cards.filter(c=>!delTomb[c.deck]);
   if(!S.log||typeof S.log!=='object')S.log={};
   // 백업·부분 저장 데이터에서 필드 누락 시 기본값 보정 (학습 중 undefined 오류 방지)
   for(const c of S.cards){
@@ -384,7 +391,8 @@ function load(){
   if(d||orphans.length||S.cards.length)save(); // 보정한 내용은 반드시 디스크에 반영 (새로고침 시 증발 방지)
 }
 function bumpVer(){try{localStorage.setItem('memoryall-ver',String(Date.now()+Math.random()))}catch{}} // 다른 탭에 변경 알림용
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S));bumpVer()}catch{toast('저장 공간이 부족합니다. 백업 후 정리하세요',4000)}}
+let LAST_GOOD=null;
+function save(){try{const j=JSON.stringify({...S,delTomb});localStorage.setItem(KEY,j);LAST_GOOD=j;bumpVer()}catch{toast('저장 공간이 부족합니다. 백업 후 정리하세요',4000)}}
 
 /* ================= 4. 간격 반복 엔진 (SM-2 기반, 순수 함수) ================= */
 const TYPES={basic:'기본',cloze:'빈칸',vocab:'단어'};
@@ -1070,6 +1078,7 @@ const ACT={
     const n=S.cards.filter(c=>c.deck===id).length;
     if(!confirm(`'${d.name}' 덱과 카드 ${n}장을 삭제할까요?`))return;
     S.decks=S.decks.filter(x=>x.id!==id);S.cards=S.cards.filter(c=>c.deck!==id);
+    delTomb[id]=Date.now();save(); // 삭제 이력 기록 — 다른 탭·복원 데이터에서 카드가 되살아나는 것 방지
     if(ST){ST.q=ST.q.filter(qid=>S.cards.some(c=>c.id===qid));if(ST.deck===id)ST.deck=null} // 진행 중인 학습 대열에서도 즉시 제거
     save();toast('삭제됨');go('#home');
   },
@@ -1411,7 +1420,9 @@ async function exportEnc(pw){ // 암호화 백업은 항상 텍스트(.txt)로 �
 async function restoreBackup(d){ // JSON 백업 객체를 검증 후 복원
   if(!d||!Array.isArray(d.decks)||!Array.isArray(d.cards))return toast('올바른 MemoryAll 백업 파일이 아닙니다');
   if(!confirm(`덱 ${d.decks.length}개, 카드 ${d.cards.length}장으로 현재 데이터를 덮어쓸까요?`))return;
-  try{localStorage.setItem(KEY,JSON.stringify(d));bumpVer()}catch{return toast('저장 공간이 부족합니다')}
+  // 삭제 이력 유지: 백업 시점 이후에 삭제된 덱의 카드가 복원으로 되살아나지 않도록 tombstone을 보전한다
+  const dt={...(d.delTomb&&typeof d.delTomb==='object'?d.delTomb:{}),...delTomb};
+  try{localStorage.setItem(KEY,JSON.stringify({...d,delTomb:dt}));bumpVer()}catch{return toast('저장 공간이 부족합니다')}
   load();save();GEN=GEN0();TUTOR=TUTOR0();PW_SESSION.pw=null;toast('복원 완료');go('#home');
 }
 
@@ -1577,19 +1588,40 @@ function mergeData(a,b){
         }}}
   }}
   const settings=((a?.settings&&typeof a.settings==='object'?a.settings:b?.settings)||{});
-  return {decks:Object.values(decks),cards:Object.values(cards),log,settings};
+  // 삭제 이력(delTomb) 우선: 한쪽이라도 "이 덱을 안다"(delTomb 없음) = 다른 쪽의 삭제는 되돌림(오동기화 복구)
+  // 양쪽 모두 delTomb에 있는 경우에만 진짜 삭제로 간주해 덱과 카드를 함께 제거한다.
+  const tA=(a&&a.delTomb&&typeof a.delTomb==='object')?a.delTomb:{};
+  const tB=(b&&b.delTomb&&typeof b.delTomb==='object')?b.delTomb:{};
+  for(const id of Object.keys(decks)){if(tA[id]&&tB[id])delete decks[id]}
+  const aliveDecks=new Set(Object.values(decks).map(d=>d.id));
+  const cardsF=Object.values(cards).filter(c=>aliveDecks.has(c.deck));
+  return {decks:Object.values(decks),cards:cardsF,log,settings};
 }
 window.addEventListener('storage',async e=>{
   if(e.key!==KEY)return;
   try{
-    const cur=JSON.parse(localStorage.getItem(KEY)||'null'),inc=JSON.parse(e.newValue||'null');
-    if(cur&&inc)localStorage.setItem(KEY,JSON.stringify(mergeData(cur,inc)));
+    const inc=JSON.parse(e.newValue||'null');
+    if(!inc){load();route();return}
+    let cur=null;try{cur=JSON.parse(localStorage.getItem(KEY)||'null')}catch{}
+    // 디스크 값이 이상하면 직전 정상 저장본(LAST_GOOD)을 기준으로 병합해 데이터 유실 방지
+    if(!cur||!Array.isArray(cur.decks))cur=(LAST_GOOD&&safeJSON(LAST_GOOD))||S;
+    // 삭제 이력 합치기 (양쪽 탭의 tombstone 모두 유지)
+    const tb={...(cur.delTomb||{}),...(inc.delTomb||{}),...delTomb};
+    // 이 탭에서 방금 삭제한 덱은 cur/디스크에 tombstone이 아직 없을 수 있으므로 메모리 사본을 보정해 병합
+    const curF=Array.isArray(cur.decks)&&cur.decks.some(d=>delTomb[d.id]&&!cur.delTomb?.[d.id])?{...cur,delTomb:{...(cur.delTomb||{}),...delTomb}}:cur;
+    if(curF&&mergeData){const m=mergeData(curF,inc);m.delTomb=tb;localStorage.setItem(KEY,JSON.stringify(m))}
   }catch{}
   const studyId=ST?ST.q[ST.i]:null,studyDeck=ST?ST.deck:null;
   closeModal();GEN=GEN0();TUTOR=TUTOR0();
   load(); // 새 데이터를 디스크에서 다시 읽어온 뒤 현재 화면 유지
   const [r,arg]=curRoute();
-  if(r==='study'){startStudy(studyDeck||'all');if(ST&&studyId){const j=ST.q.indexOf(studyId);if(j>-1)ST.i=j}drawStudy()}
+  if(r==='study'){
+    // 다른 탭에서 학습 중이던 덱/카드가 삭제됐으면 'all'(전체 학습)로 안전하게 대체
+    const deckOk=studyDeck&&S.decks.some(d=>d.id===studyDeck);
+    startStudy(deckOk?studyDeck:'all');
+    if(ST&&studyId){const j=ST.q.indexOf(studyId);if(j>-1)ST.i=j;else ST.i=0} // 삭제된 카드는 대열에 없으므로 앞으로
+    drawStudy()
+  }
   else route();
   toast('다른 탭의 변경을 반영했어요');
 });
