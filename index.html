@@ -218,11 +218,14 @@ const DAY=864e5;
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const nl=s=>esc(s).replace(/\n/g,'<br>');
-const safeUrl=u=>/^https?:\/\//i.test(String(u||''))?u:'#';
+const safeUrl=u=>{const s=String(u||'').trim();if(/^https?:\/\//i.test(s))return s;if(/^[a-z][a-z0-9+.-]*:/i.test(s))return '#';return 'https://'+s.replace(/^\/+/,'')};
 const dayKey=(t=Date.now())=>{const d=new Date(t);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
 const startOfDay=(t=Date.now())=>{const d=new Date(t);d.setHours(0,0,0,0);return d.getTime()};
 const shuffle=a=>{a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
 const isDesktop=()=>matchMedia('(min-width:821px)').matches;
+
+// 마지막에 뜬 토스트 (디버깅·테스트 훅)
+let LAST_TOAST='';
 
 // AI 응답에서 JSON 추출 (코드블록·앞뒤 잡담 대응)
 function safeJSON(t){
@@ -241,12 +244,18 @@ function findArr(o,d=0){
 }
 function plainText(x){const t=document.createElement('textarea');t.innerHTML=String(x||'').replace(/<[^>]+>/g,' ');return t.value.replace(/\s+/g,' ').trim()}
 
+// 안전한 스킴만 통과 (javascript:, data: 등 차단) → md()와 소스 링크에서 사용
+const linkUrl=u=>{const s=safeUrl(u);return /^https?:\/\//i.test(s)?s:'#'};
+
 // 간단한 마크다운 (먼저 전부 escape → XSS 방지)
 function md(src){
   const blocks=[];
   let s=esc(src).replace(/```\w*\n?([\s\S]*?)```/g,(_,c)=>{blocks.push('<pre><code>'+c+'</code></pre>');return '\n\u0000'+(blocks.length-1)+'\u0000\n'});
   s=s.replace(/`([^`\n]+)`/g,'<code>$1</code>').replace(/\*\*([^*\n]+)\*\*/g,'<b>$1</b>')
-     .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>');
+     // URL은 &amp; 등 escape된 문자도 허용하고, 마지막 / 뒤의 마크다운 기호(구두점)는 링크에서 제외
+     .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,(m,t,u)=>{const tr=u.match(/[.,!?;:)\]}]+$/),cut=tr?tr[0].length:0;
+       return `<a href="${linkUrl(u.slice(0,u.length-cut))}" target="_blank" rel="noopener noreferrer">${t}</a>${cut?u.slice(u.length-cut):''}`})
+     .replace(/(^|[\s(])((?:https?:\/\/|www\.)[^\s<]+[^\s<.,!?;:)\]])/g,(m,p,u)=>p+`<a href="${linkUrl(u)}" target="_blank" rel="noopener noreferrer">${u}</a>`);
   const out=[];let list=null;
   for(const line of s.split('\n')){
     if(/^\u0000\d+\u0000$/.test(line)){if(list){out.push('</'+list+'>');list=null}out.push(line);continue}
@@ -262,7 +271,7 @@ function md(src){
 }
 
 let toastT;
-function toast(m,ms=2600){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),ms)}
+function toast(m,ms=2600){LAST_TOAST=m;const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),ms)}
 function openModal(html){$('#modal').innerHTML=html;$('#modalBg').classList.add('show')}
 function closeModal(){$('#modalBg').classList.remove('show')}
 function download(name,text,type='application/json'){
@@ -312,7 +321,7 @@ const I={
 
 /* ================= 3. 데이터 저장소 (localStorage 'memoryall') ================= */
 const KEY='memoryall';
-const DEF_SETTINGS={newPerDay:20,ttsLang:'auto',mode:'flash',
+const DEF_SETTINGS={newPerDay:20,ttsLang:'auto',mode:'flash',pmNotify:false,pmWork:25,pmBreak:5,
   ai:{provider:'openai',base:'https://api.openai.com/v1',model:'gpt-4o-mini',key:''},
   search:{provider:'wikipedia',key:'',url:'',lang:'ko'},mcp:[]};
 let S;
@@ -344,9 +353,27 @@ function load(){
   if(!Array.isArray(S.cards))S.cards=[];
   S.cards=S.cards.filter(c=>c&&c.id&&c.front!=null);
   if(!S.log||typeof S.log!=='object')S.log={};
+  // 백업·부분 저장 데이터에서 필드 누락 시 기본값 보정 (학습 중 undefined 오류 방지)
+  for(const c of S.cards){
+    if(typeof c.deck!=='string')c.deck='';
+    if(!TYPES[c.type])c.type='basic';
+    if(c.back==null)c.back='';if(c.hint==null)c.hint='';
+    if(typeof c.due!=='number'||isNaN(c.due))c.due=c.last||Date.now();
+    if(typeof c.iv!=='number')c.iv=0;if(typeof c.ef!=='number'||c.ef<1.3)c.ef=2.5;
+    if(typeof c.reps!=='number')c.reps=0;if(typeof c.lapses!=='number')c.lapses=0;
+    if(typeof c.created!=='number')c.created=Date.now();
+  }
   if(!d){seed();save()}
+  // 덱·카드 무결성: 카드의 덱이 실존하지 않으면 새 기본 덱을 만들어 편입 (고아 카드 유실 방지)
+  let orphans=S.cards.filter(c=>!S.decks.some(x=>x.id===c.deck));
+  if(orphans.length){
+    if(!S.decks.length){const g={id:uid(),name:'기본 덱',created:Date.now()};S.decks.push(g);orphans.forEach(c=>c.deck=g.id)}
+    else{const d0=S.decks[0];orphans.forEach(c=>c.deck=d0.id)}
+  }
+  if(d||orphans.length||S.cards.length)save(); // 보정한 내용은 반드시 디스크에 반영 (새로고침 시 증발 방지)
 }
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch{toast('저장 공간이 부족합니다. 백업 후 정리하세요',4000)}}
+function bumpVer(){try{localStorage.setItem('memoryall-ver',String(Date.now()+Math.random()))}catch{}} // 다른 탭에 변경 알림용
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S));bumpVer()}catch{toast('저장 공간이 부족합니다. 백업 후 정리하세요',4000)}}
 
 /* ================= 4. 간격 반복 엔진 (SM-2 기반, 순수 함수) ================= */
 const TYPES={basic:'기본',cloze:'빈칸',vocab:'단어'};
@@ -359,7 +386,7 @@ function deckCounts(id){
   for(const c of S.cards){if(id&&c.deck!==id)continue;total++;if(!c.last)nw++;else if(c.due<end)due++}
   return {total,due,nw};
 }
-function logReview(ok,isNew){const k=dayKey(),l=S.log[k]||(S.log[k]={n:0,ok:0,nw:0});l.n++;if(ok)l.ok++;if(isNew)l.nw++}
+function logReview(ok,isNew){const k=dayKey(),l=S.log[k]||(S.log[k]={n:0,ok:0,nw:0});l.n++;if(ok)l.ok++;if(isNew)l.nw++;(l.hs||(l.hs=[])).push(new Date().getHours())}
 function streak(){let s=0,t=startOfDay()+DAY/2;if(!S.log[dayKey(t)])t-=DAY;while(S.log[dayKey(t)]){s++;t-=DAY}return s}
 function weakCards(n=10){return S.cards.filter(c=>c.last&&(c.lapses>0||c.ef<2.3)).sort((a,b)=>b.lapses-a.lapses||a.ef-b.ef).slice(0,n)}
 
@@ -379,6 +406,8 @@ function fmtIv(c,g){
   const d=nextState(c,g).iv;
   return d<30?d+'일':d<365?Math.round(d/30)+'개월':(d/365).toFixed(1)+'년';
 }
+// 간격을 사람이 읽기 좋은 형태로 (목록·통계용)
+function fmtDue(iv){return iv<1?'-':iv<30?iv+'일':iv<365?Math.round(iv/30)+'개월':(iv/365).toFixed(1)+'년'}
 function buildQueue(id){
   const end=startOfDay()+DAY,pool=S.cards.filter(c=>!id||c.deck===id);
   const rev=pool.filter(c=>c.last&&c.due<end).sort((a,b)=>a.due-b.due).map(c=>c.id);
@@ -392,7 +421,12 @@ const AI_PRESETS={openai:['OpenAI','https://api.openai.com/v1','gpt-4o-mini'],an
 const SEARCH_P={wikipedia:'Wikipedia (키 불필요)',tavily:'Tavily',serper:'Serper (Google)',brave:'Brave',searxng:'SearXNG (자체 호스팅)',custom:'직접 입력 URL'};
 
 // 모든 AI를 하나의 형식으로 호출 → {text, calls}
+// AI 요청 중복 방지: 8초 내 동일한 마지막 메시지로 재요청 시 자동 재생성 루프 차단
+const LLM_DEDUP={last:'',at:0};
 async function callLLM(messages,{tools=null,max=4096}={}){
+  const lastMsg=String(messages[messages.length-1]?.content??'').slice(0,200);
+  if(lastMsg&&lastMsg===LLM_DEDUP.last&&Date.now()-LLM_DEDUP.at<8000)throw new Error('같은 요청이 반복되어 중단했습니다. 잠시 후 다시 시도하세요');
+  LLM_DEDUP.last=lastMsg;LLM_DEDUP.at=Date.now();
   const a=S.settings.ai;
   if(!a.base||!a.model)throw new Error('설정에서 AI API 주소와 모델을 먼저 입력하세요');
   const base=a.base.trim().replace(/\/+$/,'').replace(/\/chat\/completions$/,'');
@@ -416,13 +450,22 @@ async function callLLM(messages,{tools=null,max=4096}={}){
     return {text:bl.filter(b=>b.type==='text').map(b=>b.text).join(''),calls:bl.filter(b=>b.type==='tool_use').map(b=>({id:b.id,type:'function',function:{name:b.name,arguments:JSON.stringify(b.input||{})}}))};
   }
   const h={'Content-Type':'application/json'};if(a.key)h.Authorization='Bearer '+a.key;
-  const body={model:a.model,messages,max_tokens:max};if(tools?.length)body.tools=tools;
+  const normMsgs=messages.map(m=>({...m,content:m.content??null})); // Anthropic과 달리 content:null도 허용
+  const body={model:a.model,messages:normMsgs,max_tokens:max};if(tools?.length)body.tools=tools;
   const post=()=>fetchJ(base+'/chat/completions',{method:'POST',headers:h,body:JSON.stringify(body)},300000);
   let d;
   try{d=await post()}
-  catch(e){ // 최신 OpenAI 모델은 max_completion_tokens를 요구
-    if(!/max_completion_tokens/.test(e.message))throw e;
-    delete body.max_tokens;body.max_completion_tokens=max;d=await post();
+  catch(e){ // 일부 API는 max_completion_tokens나 tools 필드를 요구/거부 → 형식 바꿔 재시도
+    const msg=e.message||'';
+    if(/max_completion_tokens/.test(msg)){delete body.max_tokens;body.max_completion_tokens=max;d=await post()}
+    else if(/tool/i.test(msg)&&body.tools){delete body.tools;d=await post()}
+    // Anthropic 엔드포인트를 OpenAI 방식으로 잘못 입력한 경우 → Messages API로 자동 전환
+    else if(/\/v1\/messages|Messages API|x-api-key|anthropic-version/i.test(msg)&&!/\/messages$/i.test(base)){
+      const d2=await fetchJ(base+'/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':a.key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:a.model,max_tokens:max,messages:[{role:'user',content:String(messages.findLast?.(m=>m.role!=='system')?.content??'')}].filter(m=>m.content)})},300000);
+      const bl=d2.content||[];
+      return {text:bl.filter(b=>b.type==='text').map(b=>b.text).join(''),calls:bl.filter(b=>b.type==='tool_use').map(b=>({id:b.id,type:'function',function:{name:b.name,arguments:JSON.stringify(b.input||{})}}))};
+    }
+    else throw e;
   }
   const m=d.choices?.[0]?.message||{};
   return {text:m.content||'',calls:m.tool_calls||[]};
@@ -501,29 +544,61 @@ function speak(t){
 const stopSpeak=()=>{try{window.speechSynthesis?.cancel()}catch{}};
 function beep(){try{const a=new(window.AudioContext||window.webkitAudioContext)(),o=a.createOscillator(),g=a.createGain();o.frequency.value=880;g.gain.setValueAtTime(.15,a.currentTime);g.gain.exponentialRampToValueAtTime(.001,a.currentTime+.6);o.connect(g).connect(a.destination);o.start();o.stop(a.currentTime+.6)}catch{}}
 
-const PM_LEN={work:1500,break:300},PM={mode:'work',left:1500,end:0,run:false,t:0};
+let PM_LEN={work:1500,break:300};
+const PM={mode:'work',left:1500,end:0,run:false,t:0,cycles:0};
+function pmLoad(){ // 설정·진행 상태 복원 (새로고침 후에도 이어짐)
+  const cl=v=>Math.min(v>180?180:60,Math.max(1,Math.round(+v)||0)); // 분 단위, 범위 제한
+  PM_LEN={work:cl(S.settings.pmWork||25)*60,break:cl(S.settings.pmBreak||5)*60};
+  try{const c=JSON.parse(localStorage.getItem('memoryall-pomodoro')||'null');if(c){
+    PM.mode=c.mode==='break'?'break':'work';PM.cycles=Math.max(0,+c.cycles||0);
+    if(c.run&&+c.end>Date.now()){PM.left=Math.ceil((c.end-Date.now())/1000);PM.end=+c.end;PM.run=true;PM.t=setInterval(pmTick,500)}
+    else if(c.run&&+c.end){ // 종료 시각이 지남 → 남은 시간을 다음 판에 반영 (예: 집중 끝→휴식 시작)
+      let over=Math.floor((Date.now()-+c.end)/1000),m=c.mode==='work'?'break':'work';
+      while(over>=PM_LEN[m]){over-=PM_LEN[m];if(m==='work')PM.cycles++;m=m==='work'?'break':'work'}
+      PM.mode=m;PM.left=Math.max(1,PM_LEN[m]-over);PM.end=Date.now()+PM.left*1000;PM.run=true;PM.t=setInterval(pmTick,500);
+    }
+    else PM.left=PM_LEN[PM.mode];
+  }}catch{}
+}
+function pmSave(){try{localStorage.setItem('memoryall-pomodoro',JSON.stringify({mode:PM.mode,left:PM.left,run:PM.run,end:PM.end,cycles:PM.cycles,work:PM_LEN.work,brk:PM_LEN.break}))}catch{}}
+function pmFmt(s){return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')}
 function pmDraw(){
-  const m=String(Math.floor(PM.left/60)).padStart(2,'0')+':'+String(PM.left%60).padStart(2,'0');
-  $('#pmTime').textContent=m;$('#pmMode').textContent=PM.mode==='work'?'집중':'휴식';
-  $('#pmToggle').innerHTML=ic(PM.run?I.pause:I.play);$('#pmReset').innerHTML=ic(I.reset);
-  $('#pmMini').innerHTML=ic(PM.run?I.pause:I.clock)+m;
+  const m=pmFmt(PM.left),wt=PM_LEN.work/60,bt=PM_LEN.break/60;
+  if($('#pmTime'))$('#pmTime').textContent=m;
+  if($('#pmMode'))$('#pmMode').textContent=(PM.mode==='work'?'집중':'휴식')+(PM.cycles?` · ${PM.cycles}회`:'');
+  if($('#pmTime'))$('#pmTime').title=`설정에서 시간을 바꿀 수 있어요 (기본 집중 ${wt}분 / 휴식 ${bt}분)`;
+  if($('#pmToggle'))$('#pmToggle').innerHTML=ic(PM.run?I.pause:I.play);
+  if($('#pmReset'))$('#pmReset').innerHTML=ic(I.reset);
+  if($('#pmMini'))$('#pmMini').innerHTML=ic(PM.run?I.pause:I.clock)+m;
   document.title=PM.run?m+' · MemoryAll':'MemoryAll';
 }
+function pmNotify(t,b){
+  toast(t,6000);
+  if(!S.settings.pmNotify)return; // 설정에서 켜야 브라우저 알림 요청
+  try{if('Notification' in window){
+    if(Notification.permission==='granted')new Notification('MemoryAll 뽀모도로',{body:b,icon:document.getElementById('favicon').href});
+    else if(Notification.permission!=='denied')Notification.requestPermission().then(p=>{if(p==='granted')new Notification('MemoryAll 뽀모도로',{body:b})});
+  }}catch{}
+}
 function pmTick(){
+  if(!PM.run)return;
   PM.left=Math.max(0,Math.round((PM.end-Date.now())/1000));
   if(PM.left<=0){
-    clearInterval(PM.t);PM.run=false;const was=PM.mode;PM.mode=was==='work'?'break':'work';PM.left=PM_LEN[PM.mode];
-    navigator.vibrate?.([200,100,200]);beep();toast(was==='work'?'집중 끝! 5분 쉬어요':'휴식 끝! 다시 집중해요',5000);
+    clearInterval(PM.t);PM.run=false;const was=PM.mode;
+    if(was==='work')PM.cycles++;
+    PM.mode=was==='work'?'break':'work';PM.left=PM_LEN[PM.mode];
+    navigator.vibrate?.([200,100,200]);beep();
+    pmNotify(was==='work'?`집중 끝! ${PM_LEN.break/60}분 쉬어요`:'휴식 끝! 다시 집중해요',was==='work'?'브라우저가 가려져 있어 이 알림을 보냅니다.':'다시 집중할 시간입니다!');
   }
-  pmDraw();
+  pmDraw();pmSave();
 }
-function pmToggle(){if(PM.run){clearInterval(PM.t);PM.run=false}else{PM.end=Date.now()+PM.left*1000;PM.run=true;PM.t=setInterval(pmTick,500)}pmDraw()}
-function pmReset(){clearInterval(PM.t);PM.run=false;PM.mode='work';PM.left=PM_LEN.work;pmDraw()}
+function pmToggle(){if(PM.run){clearInterval(PM.t);PM.run=false}else{PM.end=Date.now()+PM.left*1000;PM.run=true;PM.t=setInterval(pmTick,500)}pmDraw();pmSave()}
+function pmReset(){clearInterval(PM.t);PM.run=false;PM.mode='work';PM.left=PM_LEN.work;PM.cycles=0;pmDraw();pmSave()}
 
 /* ================= 7. 화면 — 각 함수는 #main만 다시 그림 ================= */
 const M=h=>{$('#main').innerHTML=h};
 const fld=(label,inner,help='')=>`<div class="field"><label>${label}</label>${inner}${help?`<div class="sub" style="margin-top:6px">${help}</div>`:''}</div>`;
-const inp=(path,val,ph='',type='text')=>`<input type="${type}" data-set="${path}" value="${esc(val)}" placeholder="${esc(ph)}" autocomplete="off">`;
+const inp=(path,val,ph='',type='text')=>`<input type="${type}" data-set="${esc(path)}" value="${esc(val)}" placeholder="${esc(ph)}" autocomplete="off">`;
 const statBox=(l,n,i)=>`<div class="card stat"><div class="l">${ic(I[i])}${l}</div><div class="n">${n}</div></div>`;
 const closeBtn=()=>`<button class="icon-btn" data-act="close">${ic(I.x)}</button>`;
 let deferredPrompt=null,ST=null,DQ='',MN='';
@@ -564,26 +639,28 @@ function vHome(){
   <div class="grid" style="margin-bottom:14px">${statBox('복습 대기',all.due,'clock')}${statBox('새 카드',nw,'plus')}${statBox('연속 학습',streak()+'일','flame')}${statBox('오늘 학습',(S.log[dayKey()]?.n||0)+'장','check')}</div>
   ${all.due+nw?`<a class="btn pri" href="#study/all" style="width:100%;padding:13px;margin-bottom:26px">${ic(I.play)}전체 학습 시작</a>`:`<div class="card empty" style="margin-bottom:26px;padding:22px">오늘 할 복습을 모두 끝냈어요</div>`}
   <h2>${ic(I.study)}내 덱</h2>
-  ${S.decks.length?`<div class="grid">${S.decks.map(d=>{const c=deckCounts(d.id);return `<div class="card deck" data-act="openDeck" data-id="${d.id}"><div class="name">${esc(d.name)}</div><div class="pills"><span class="pill b">복습 ${c.due}</span><span class="pill g">새 ${c.nw}</span><span class="pill">전체 ${c.total}</span></div></div>`}).join('')}</div>`
+  ${S.decks.length?`<div class="grid">${S.decks.map(d=>{const c=deckCounts(d.id);return `<div class="card deck" data-act="openDeck" data-id="${esc(d.id)}"><div class="name">${esc(d.name)}</div><div class="pills"><span class="pill b">복습 ${c.due}</span><span class="pill g">새 ${c.nw}</span><span class="pill">전체 ${c.total}</span></div></div>`}).join('')}</div>`
   :`<div class="card empty"><div class="bigic" style="background:var(--accent-soft);color:var(--accent)">${ic(I.study)}</div>아직 덱이 없어요<div class="row" style="justify-content:center;margin-top:14px"><button class="btn pri" data-act="newDeck">${ic(I.plus)}새 덱</button><a class="btn" href="#gen">${ic(I.spark)}AI로 만들기</a></div></div>`}`);
 }
 
 /* ---------- 덱 상세 ---------- */
 function vDeck(id){
   const d=S.decks.find(x=>x.id===id);if(!d){location.hash='#home';return}
-  const c=deckCounts(id);
-  M(`<div class="head"><div class="row" style="flex-wrap:nowrap;min-width:0"><a class="icon-btn" href="#home">${ic(I.back)}</a><div style="min-width:0"><h1>${esc(d.name)}</h1><div class="pills" style="margin-top:4px"><span class="pill b">복습 ${c.due}</span><span class="pill g">새 ${c.nw}</span><span class="pill">전체 ${c.total}</span></div></div></div>
-  <div class="row" style="gap:6px"><a class="btn pri" href="#study/${d.id}">${ic(I.play)}학습</a><button class="btn" data-act="addCard" data-id="${d.id}">${ic(I.plus)}추가</button>
-  <button class="icon-btn" data-act="import" data-id="${d.id}" title="가져오기">${ic(I.upload)}</button><button class="icon-btn" data-act="exportDeck" data-id="${d.id}" title="CSV 내보내기">${ic(I.download)}</button><button class="icon-btn" data-act="renameDeck" data-id="${d.id}" title="이름 변경">${ic(I.edit)}</button><button class="icon-btn" data-act="delDeck" data-id="${d.id}" title="덱 삭제">${ic(I.trash)}</button></div></div>
-  <div class="card"><input id="deckQ" data-deck="${d.id}" placeholder="카드 검색" value="${esc(DQ)}" style="margin-bottom:6px"><div class="list" id="cardList"></div></div>`);
+  const c=deckCounts(id),st=S.cards.filter(x=>x.deck===id&&x.last);
+  const avg=st.length?Math.round(st.reduce((a,x)=>a+x.ef,0)/st.length*100)/100:0;
+  M(`<div class="head"><div class="row" style="flex-wrap:nowrap;min-width:0"><a class="icon-btn" href="#home">${ic(I.back)}</a><div style="min-width:0"><h1>${esc(d.name)}</h1><div class="pills" style="margin-top:4px"><span class="pill b">복습 ${c.due}</span><span class="pill g">새 ${c.nw}</span><span class="pill">전체 ${c.total}</span>${avg?`<span class="pill a">평균 용이도 ${avg}</span>`:''}</div></div></div>
+  <div class="row" style="gap:6px"><a class="btn pri" href="#study/${encodeURIComponent(d.id)}">${ic(I.play)}학습</a><button class="btn" data-act="addCard" data-id="${esc(d.id)}">${ic(I.plus)}추가</button>
+  <button class="icon-btn" data-act="import" data-id="${esc(d.id)}" title="가져오기">${ic(I.upload)}</button><button class="icon-btn" data-act="exportDeck" data-id="${esc(d.id)}" title="CSV 내보내기">${ic(I.download)}</button><button class="icon-btn" data-act="renameDeck" data-id="${esc(d.id)}" title="이름 변경">${ic(I.edit)}</button><button class="icon-btn" data-act="delDeck" data-id="${esc(d.id)}" title="덱 삭제">${ic(I.trash)}</button></div></div>
+  <div class="card"><input id="deckQ" data-deck="${esc(d.id)}" placeholder="카드 검색" value="${esc(DQ)}" style="margin-bottom:6px"><div class="list" id="cardList"></div></div>`);
   drawCardList(id);
 }
 function drawCardList(id){
   const q=DQ.toLowerCase(),now=Date.now(),box=$('#cardList');if(!box)return;
   const list=S.cards.filter(c=>c.deck===id&&(!q||(c.front+' '+c.back+' '+c.hint).toLowerCase().includes(q)));
   box.innerHTML=list.length?list.map(c=>`<div class="item"><div class="tx"><div class="f">${esc(prev(c.front))}</div><div class="b">${esc(c.back||c.hint||'')}</div></div>
+  ${c.last?`<span class="pill hide-m" title="복습 간격 · 반복 ${c.reps}회 · 틀림 ${c.lapses}회 · 용이도 ${Math.round(c.ef*100)/100}">간격 ${fmtDue(c.iv)}</span>`:''}
   <span class="pill ${!c.last?'g':c.due<=now?'b':''} hide-m">${!c.last?'새 카드':c.due<=now?'복습 대기':Math.ceil((c.due-now)/DAY)+'일 후'}</span>
-  <button class="icon-btn" data-act="editCard" data-id="${c.id}">${ic(I.edit)}</button><button class="icon-btn" data-act="delCard" data-id="${c.id}">${ic(I.trash)}</button></div>`).join('')
+  <button class="icon-btn" data-act="editCard" data-id="${esc(c.id)}">${ic(I.edit)}</button><button class="icon-btn" data-act="delCard" data-id="${esc(c.id)}">${ic(I.trash)}</button></div>`).join('')
   :`<div class="empty">${q?'검색 결과가 없어요':'카드가 없어요. 추가하거나 가져와 보세요'}</div>`;
 }
 
@@ -603,7 +680,7 @@ function makeChoices(c){
 function drawStudy(){
   if(!ST)return;
   while(ST.i<ST.q.length&&!curCard())ST.i++;
-  const deck=ST.deck&&S.decks.find(d=>d.id===ST.deck),title=deck?esc(deck.name):'전체 학습',back=deck?'#deck/'+deck.id:'#home';
+  const deck=ST.deck&&S.decks.find(d=>d.id===ST.deck),title=deck?esc(deck.name):'전체 학습',back=deck?'#deck/'+encodeURIComponent(deck.id):'#home';
   const c=curCard();
   if(!c){
     M(`<div class="head"><div class="row"><a class="icon-btn" href="${back}">${ic(I.back)}</a><h1>${title}</h1></div></div><div class="card empty">
@@ -645,9 +722,12 @@ function drawStudy(){
 function grade(g){
   if(!ST||!ST.show)return;
   const id=ST.q[ST.i],idx=S.cards.findIndex(c=>c.id===id);
+  let ok=g>1;
+  if(ST.mode==='quiz'&&ST.choices)ok=ST.picked!=null&&ST.choices[ST.picked]===ansText(curCard()||S.cards[idx]);
+  else if(ST.mode==='type'&&ST.typed!=null)ok=!!ST.correct;
   if(idx>-1){
     const isNew=!S.cards[idx].last;
-    S.cards[idx]=nextState(S.cards[idx],g);logReview(g>1,isNew);save();
+    S.cards[idx]={...nextState(S.cards[idx],g),updated:Date.now()};logReview(ok,isNew);save();
     navigator.vibrate?.(g===1?[30,40,30]:15);
     if(g===1)ST.q.splice(Math.min(ST.q.length,ST.i+4),0,id); // 틀린 카드는 몇 장 뒤에 다시
   }
@@ -656,6 +736,7 @@ function grade(g){
 function pick(i){
   if(!ST||ST.show||!ST.choices)return;
   ST.picked=i;ST.show=true;ST.correct=ST.choices[i]===ansText(curCard());
+  if(!ST.correct&&curCard()?.type==='cloze')ST.hint=true; // 오답 시 빈칸 답을 힌트로 보여줌
   navigator.vibrate?.(ST.correct?15:[30,40,30]);drawStudy();
 }
 function checkType(){
@@ -673,7 +754,7 @@ async function mnemonic(){
     const {text}=await callLLM([{role:'system',content:'너는 기억술 전문가다. 주어진 카드를 오래 기억하도록 1) 선명한 연상 이미지나 짧은 이야기 2) 가능하면 두문자어나 말장난 3) 한 줄 암기 문장을 짧게 제시한다. 한국어로 답한다.'},{role:'user',content:`앞면: ${prev(c.front)}\n답: ${ansText(c)}`}]);
     MN=text;const b=$('#mnBody');if(!b)return;
     b.className='';b.innerHTML=md(text||'(응답이 비어 있습니다)');
-    if(text)b.insertAdjacentHTML('afterend',`<div class="row" style="justify-content:flex-end;margin-top:14px"><button class="btn pri" data-act="saveMn" data-id="${c.id}">${ic(I.bulb)}힌트로 저장</button></div>`);
+    if(text)b.insertAdjacentHTML('afterend',`<div class="row" style="justify-content:flex-end;margin-top:14px"><button class="btn pri" data-act="saveMn" data-id="${esc(c.id)}">${ic(I.bulb)}힌트로 저장</button></div>`);
   }catch(e){const b=$('#mnBody');if(b)b.innerHTML=`<span style="color:var(--red)">${esc(e.message)}</span>`}
 }
 
@@ -681,39 +762,44 @@ async function mnemonic(){
 function deckModal(id){
   const d=id&&S.decks.find(x=>x.id===id);
   openModal(`<h2>${d?'덱 이름 변경':'새 덱'}${closeBtn()}</h2>${fld('덱 이름',`<input id="dName" value="${esc(d?.name||'')}" placeholder="예: 토익 단어" autocomplete="off">`)}
-  <div class="row" style="justify-content:flex-end"><button class="btn" data-act="close">취소</button><button class="btn pri" data-act="saveDeck" data-id="${d?.id||''}">저장</button></div>`);
-  setTimeout(()=>$('#dName')?.focus(),50);
+  <div class="row" style="justify-content:flex-end"><button class="btn" data-act="close">취소</button><button class="btn pri" data-act="saveDeck" data-id="${esc(d?.id||'')}">저장</button></div>`);
+  setTimeout(()=>{$('#dName')?.focus();$('#dName')?.select()},50);
 }
 function saveDeck(id){
   const n=$('#dName').value.trim();if(!n)return toast('덱 이름을 입력하세요');
   closeModal();
   if(id){const d=S.decks.find(x=>x.id===id);if(d)d.name=n;save();rerender();return}
-  const d={id:uid(),name:n,created:Date.now()};S.decks.push(d);save();go('#deck/'+d.id);
+  const d={id:uid(),name:n,created:Date.now()};S.decks.push(d);save();go('#deck/'+encodeURIComponent(d.id));
 }
 function cardModal(id,deckId){
   const c=id?S.cards.find(x=>x.id===id):null;
   if(!S.decks.length){S.decks.push({id:uid(),name:'기본 덱',created:Date.now()});save()}
   const dk=c?c.deck:deckId||S.decks[0].id,t=c?.type||'basic';
   openModal(`<h2>${c?'카드 수정':'카드 추가'}${closeBtn()}</h2>
-  <div class="two">${fld('덱',`<select id="cDeck">${S.decks.map(d=>`<option value="${d.id}" ${dk===d.id?'selected':''}>${esc(d.name)}</option>`).join('')}</select>`)}${fld('유형',`<select id="cType">${Object.entries(TYPES).map(([k,v])=>`<option value="${k}" ${t===k?'selected':''}>${v}</option>`).join('')}</select>`)}</div>
+  <div class="two">${fld('덱',`<select id="cDeck">${S.decks.map(d=>`<option value="${esc(d.id)}" ${dk===d.id?'selected':''}>${esc(d.name)}</option>`).join('')}</select>`)}${fld('유형',`<select id="cType">${Object.entries(TYPES).map(([k,v])=>`<option value="${k}" ${t===k?'selected':''}>${v}</option>`).join('')}</select>`)}</div>
   ${fld('앞면',`<textarea id="cFront" placeholder="질문, 단어 또는 문장">${esc(c?.front||'')}</textarea>`,'빈칸 카드는 정답을 {{정답}}처럼 감싸세요 · Ctrl+Enter 저장')}
   ${fld('뒷면',`<textarea id="cBack" placeholder="답 또는 뜻 (빈칸 카드는 보충 설명)">${esc(c?.back||'')}</textarea>`)}
   ${fld('힌트 · 예문',`<input id="cHint" value="${esc(c?.hint||'')}" placeholder="선택" autocomplete="off">`)}
-  <div class="row" style="justify-content:flex-end"><button class="btn" data-act="close">닫기</button><button class="btn pri" data-act="saveCard" data-id="${c?.id||''}">${ic(I.check)}저장</button></div>`);
+  <div class="row" style="justify-content:flex-end"><button class="btn" data-act="close">닫기</button><button class="btn pri" data-act="saveCard" data-id="${esc(c?.id||'')}">${ic(I.check)}저장</button></div>`);
+  // Enter로 줄바꿈 대신 바로 저장 (Ctrl+Enter도 지원)
+  $('#cFront').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();saveCard(c?.id||'')}});
+  $('#cBack').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();saveCard(c?.id||'')}});
+  setTimeout(()=>$('#cFront')?.focus(),50);
 }
 function saveCard(id){
+  if(!$('#cFront'))return; // 이미 저장·닫힌 뒤 중복 호출 방지
   const f=$('#cFront').value.trim(),b=$('#cBack').value.trim(),h=$('#cHint').value.trim(),t=$('#cType').value,dk=$('#cDeck').value;
   if(!f)return toast('앞면을 입력하세요');
   if(t==='cloze'&&!/\{\{.+?\}\}/.test(f))return toast('빈칸 카드는 {{정답}} 표시가 필요합니다');
   if(t!=='cloze'&&!b)return toast('뒷면을 입력하세요');
-  if(id){const c=S.cards.find(x=>x.id===id);if(c)Object.assign(c,{front:f,back:b,hint:h,type:t,deck:dk});save();closeModal();toast('수정됨')}
+  if(id){const c=S.cards.find(x=>x.id===id);if(c)Object.assign(c,{front:f,back:b,hint:h,type:t,deck:dk,updated:Date.now()});save();closeModal();toast('수정됨')}
   else{S.cards.push(newCard(dk,f,b,h,t));save();['cFront','cBack','cHint'].forEach(k=>$('#'+k).value='');$('#cFront').focus();toast('추가됨 · 계속 입력하세요')}
   rerender();
 }
 function importModal(deckId){
   openModal(`<h2>카드 가져오기${closeBtn()}</h2>
-  ${fld('대상 덱',`<select id="imDeck">${S.decks.map(d=>`<option value="${d.id}" ${d.id===deckId?'selected':''}>${esc(d.name)}</option>`).join('')}<option value="__new" ${S.decks.length?'':'selected'}>+ 새 덱 만들기</option></select>`)}
-  ${fld('파일 (CSV · TXT · TSV)',`<input type="file" id="imFile" accept=".csv,.txt,.tsv,text/plain,text/csv">`)}
+  ${fld('대상 덱',`<select id="imDeck">${S.decks.map(d=>`<option value="${esc(d.id)}" ${d.id===deckId?'selected':''}>${esc(d.name)}</option>`).join('')}<option value="__new" ${S.decks.length?'':'selected'}>+ 새 덱 만들기</option></select>`)}
+  ${fld('파일 (CSV · TXT · TSV)',`<input type="file" id="imFile" accept=".csv,.txt,.tsv,text/csv,text/plain" multiple>`)}
   ${fld('또는 직접 붙여넣기',`<textarea id="imText" style="min-height:140px" placeholder="앞면,뒷면,힌트&#10;apple,사과,I ate an apple.&#10;{{서울}}은 한국의 수도다."></textarea>`,'한 줄에 카드 하나 · 구분자(탭, |, 쉼표) 자동 인식 · {{ }}가 있으면 빈칸 카드')}
   <div class="row" style="justify-content:flex-end"><button class="btn" data-act="close">취소</button><button class="btn pri" data-act="doImport">${ic(I.upload)}가져오기</button></div>`);
 }
@@ -728,16 +814,18 @@ function parseImport(t){
   const lines=String(t).replace(/^\ufeff/,'').replace(/\r/g,'').split('\n').filter(l=>l.trim());
   if(!lines.length)return [];
   const sep=lines[0].includes('\t')?'\t':lines[0].includes('|')?'|':',';
-  const rows=lines.map(l=>sep===','?csvRow(l):l.split(sep).map(x=>x.trim()));
+  let rows=lines.map(l=>sep===','?csvRow(l):l.split(sep).map(x=>x.trim()));
   if(/^(front|앞면|question|질문)$/i.test(rows[0][0]))rows.shift();
+  // 쉼표 파일에서 앞면에 쉼표가 따옴표 없이 포함됐던 행 복구 (뒷면·힌트를 앞면으로 합침)
+  if(sep===',')rows=rows.map(r=>{if(r.length<=3)return r;const[f,b,h,...ex]=r;return [f,[b,h,...ex].filter(Boolean).join(', ')]});
   return rows.filter(r=>r[0]).map(([f,b='',h=''])=>({front:f,back:b,hint:h,type:/\{\{.+?\}\}/.test(f)?'cloze':'basic'}));
 }
 function doImport(){
   const rows=parseImport($('#imText').value);if(!rows.length)return toast('가져올 내용이 없습니다');
   let dk=$('#imDeck').value;
-  if(dk==='__new'){const d={id:uid(),name:'가져온 카드 '+dayKey(),created:Date.now()};S.decks.push(d);dk=d.id}
+  if(dk==='__new'||!S.decks.some(d=>d.id===dk)){const d={id:uid(),name:'가져온 카드 '+dayKey(),created:Date.now()};S.decks.push(d);dk=d.id}
   rows.forEach(r=>S.cards.push(newCard(dk,r.front,r.back,r.hint,r.type)));
-  save();closeModal();toast(rows.length+'장을 가져왔어요');go('#deck/'+dk);
+  save();closeModal();toast(rows.length+'장을 가져왔어요');go('#deck/'+encodeURIComponent(dk));
 }
 
 /* ---------- AI 카드 생성 ---------- */
@@ -746,11 +834,12 @@ function vGen(){
   M(`<div class="head"><div><h1>AI 카드 생성</h1><div class="sub">주제나 공부 자료를 넣으면 암기 카드로 만들어 드려요</div></div></div>
   <div class="card" style="margin-bottom:14px">
   ${fld('주제 또는 자료',`<textarea id="gSrc" style="min-height:140px" placeholder="예: 조선 왕 순서 / 토익 필수 동사 30개 / 교과서 내용 붙여넣기">${esc(GEN.src)}</textarea>`)}
-  <div class="two">${fld('저장할 덱',`<select id="gDeck">${S.decks.map(d=>`<option value="${d.id}" ${GEN.deck===d.id?'selected':''}>${esc(d.name)}</option>`).join('')}<option value="__new" ${GEN.deck==='__new'||!S.decks.length?'selected':''}>+ 새 덱 만들기</option></select>`)}
+  <div class="two">${fld('저장할 덱',`<select id="gDeck">${S.decks.map(d=>`<option value="${esc(d.id)}" ${GEN.deck===d.id?'selected':''}>${esc(d.name)}</option>`).join('')}<option value="__new" ${GEN.deck==='__new'||!S.decks.length?'selected':''}>+ 새 덱 만들기</option></select>`)}
   ${fld('카드 유형',`<select id="gType">${Object.entries(T).map(([k,v])=>`<option value="${k}" ${GEN.type===k?'selected':''}>${v}</option>`).join('')}</select>`)}</div>
   <div class="two">${fld('카드 수 (1~100)',`<input id="gCount" type="number" min="1" max="100" value="${GEN.count}">`)}
   <div class="field"><label>옵션</label><label class="toggle ${GEN.web?'on':''}" style="height:42px;border-radius:10px"><input type="checkbox" id="gWeb" class="chk" ${GEN.web?'checked':''}>${ic(I.globe)}웹 검색으로 사실 보강</label></div></div>
-  <button class="btn pri" data-act="gen" style="width:100%;padding:12px" ${GEN.busy?'disabled':''}>${GEN.busy?'<span class="spin"></span>생성 중...':ic(I.spark)+'카드 생성하기'}</button></div>
+  <button class="btn pri" data-act="gen" style="width:100%;padding:12px" ${GEN.busy?'disabled':''}>${GEN.busy?'<span class="spin"></span>생성 중...':ic(I.spark)+'카드 생성하기'}</button>
+  <button class="btn ghost" data-act="genOffline" style="width:100%;margin-top:8px" ${GEN.busy?'disabled':''}>${ic(I.download)}AI 없이 생성 (본문 문장에서 추출)</button></div>
   ${GEN.items.length?`<div class="card"><h2 style="justify-content:space-between"><span>미리보기 · ${sel}/${GEN.items.length}장</span><button class="btn sm" data-act="genAll">전체 선택/해제</button></h2>
   <div class="list">${GEN.items.map((x,i)=>`<label class="item" style="cursor:pointer;margin:0;color:var(--text);font-weight:400;font-size:14.5px"><input type="checkbox" class="chk" data-gi="${i}" ${x.on?'checked':''}><div class="tx"><div class="f">${esc(prev(x.front))}</div><div class="b">${esc(x.back||x.hint)}</div></div><span class="pill a">${TYPES[x.type]}</span></label>`).join('')}</div>
   <button class="btn pri" data-act="genSave" style="width:100%;margin-top:12px;padding:12px">${ic(I.check)}선택한 ${sel}장 저장</button></div>`:''}`);
@@ -771,7 +860,7 @@ async function doGen(){
     let ctx='';
     if(GEN.web){try{ctx=fmtResults(await webSearch(src.slice(0,100)))}catch(e){toast('검색 실패: '+e.message)}}
     const rule={basic:'모두 basic으로',cloze:'모두 cloze로',vocab:'모두 vocab으로',mixed:'basic, cloze, vocab을 내용에 맞게 섞어서'}[GEN.type];
-    const sys='너는 암기 카드 제작 전문가다. 반드시 JSON 배열만 출력한다. 설명과 코드블록은 쓰지 않는다.\n형식: [{"type":"basic|cloze|vocab","front":"...","back":"...","hint":"..."}]\n규칙: basic은 front에 질문, back에 간결한 답. cloze는 front 문장 속 핵심어를 {{정답}}으로 감싸고 back은 빈 문자열이나 보충 설명. vocab은 front에 단어, back에 뜻, hint에 예문. 카드 하나에는 개념 하나만(최소 정보 원칙). 확실한 사실만 쓴다.';
+    const sys='너는 암기 카드 제작 전문가다. 반드시 JSON 배열만 출력한다. 설명과 코드블록은 쓰지 않는다.\n형식: [{"type":"basic|cloze|vocab","front":"...","back":"...","hint":"..."}]\n규칙: basic은 front에 질문, back에 간결한 답. cloze는 front 문장 속 핵심어를 {{정답}}으로 감싸고 back은 빈 문자열이나 보충 설명. vocab은 front에 단어, back에 뜻, hint에 예문. 카드 하나에는 개념 하나만(최소 정보 원칙). 앞면·뒷면·힌트 안에는 큰따옴표(")나 줄바꿈을 넣지 않는다. 확실한 사실만 쓴다.';
     const {text}=await callLLM([{role:'system',content:sys},{role:'user',content:`${src}\n\n위 내용으로 카드 ${n}장을 ${rule} 만들어라.${ctx?'\n\n참고 자료:\n'+ctx:''}`}]);
     const j=safeJSON(text),list=Array.isArray(j)?j:findArr(j);
     if(!list)throw new Error('AI 응답에서 카드를 찾지 못했습니다. 다시 시도하세요');
@@ -790,7 +879,7 @@ function genSave(){
   let dk=GEN.deck;
   if(dk==='__new'||!S.decks.some(d=>d.id===dk)){const d={id:uid(),name:GEN.src.trim().split('\n')[0].slice(0,24)||'AI 카드',created:Date.now()};S.decks.push(d);dk=d.id}
   items.forEach(x=>S.cards.push(newCard(dk,x.front,x.back,x.hint,x.type)));
-  save();GEN.items=[];GEN.deck=dk;toast(items.length+'장 저장됨');go('#deck/'+dk);
+  save();GEN.items=[];GEN.deck=dk;toast(items.length+'장 저장됨');go('#deck/'+encodeURIComponent(dk));
 }
 
 /* ---------- AI 튜터 ---------- */
@@ -799,7 +888,7 @@ const QUICK=[['쉽게 설명','다음 개념을 아주 쉽게 설명해줘: '],[
 function vTutor(){
   const n=S.settings.mcp.length;
   M(`<div class="head" style="margin-bottom:14px"><div><h1>AI 튜터</h1><div class="sub">설명, 퀴즈, 암기법을 도와드려요</div></div>
-  <div class="row" style="gap:6px"><button class="toggle ${TUTOR.web?'on':''}" data-act="tWeb">${ic(I.globe)}웹 검색</button><button class="toggle ${TUTOR.mcp?'on':''}" data-act="tMcp">${ic(I.plug)}MCP${n?' '+n:''}</button><button class="icon-btn" data-act="clearChat" title="대화 지우기">${ic(I.trash)}</button></div></div>
+  <div class="row" style="gap:6px"><button class="toggle ${TUTOR.web?'on':''}" data-act="tWeb">${ic(I.globe)}웹 검색</button><button class="toggle ${TUTOR.mcp?'on':''}" data-act="tMcp">${ic(I.plug)}MCP${n?' '+n:''}</button><button class="icon-btn" data-act="keepChat" title="대화 저장">${ic(I.download)}</button><button class="icon-btn" data-act="chats" title="저장된 대화">${ic(I.clock)}</button><button class="icon-btn" data-act="clearChat" title="대화 지우기">${ic(I.trash)}</button></div></div>
   <div class="chat"><div class="msgs" id="msgs"></div>
   <div class="row" style="gap:6px;margin:8px 0">${QUICK.map(([l],i)=>`<button class="btn sm" data-act="quick" data-i="${i}">${l}</button>`).join('')}<button class="btn sm" data-act="weakAsk">${ic(I.alert)}약한 카드 공략</button></div>
   <div class="composer"><textarea id="tIn" rows="1" placeholder="무엇이든 물어보세요"></textarea><button class="btn pri" data-act="send">${ic(I.send)}</button></div></div>`);
@@ -811,7 +900,7 @@ function drawMsgs(){
   box.innerHTML=(TUTOR.msgs.length?'':`<div class="empty"><div class="bigic" style="background:var(--accent-soft);color:var(--accent)">${ic(I.chat)}</div>궁금한 것을 물어보거나 아래 버튼으로 시작하세요</div>`)
   +TUTOR.msgs.map((m,i)=>m.role==='u'?`<div class="msg u">${esc(m.text)}</div>`
     :m.role==='t'?`<div class="msg t">${ic(I.plug)}${esc(m.text)}</div>`
-    :`<div class="msg a">${md(m.text)}${m.src?`<div class="src">${m.src.map((x,j)=>`<a href="${esc(safeUrl(x.url))}" target="_blank" rel="noopener">[${j+1}] ${esc(x.title)}</a>`).join('')}</div>`:''}
+    :`<div class="msg a">${md(m.text)}${m.src?`<div class="src">${m.src.map((x,j)=>`<a href="${esc(linkUrl(x.url))}" target="_blank" rel="noopener noreferrer">${esc(x.title)}</a>`).join('')}</div>`:''}
       ${m.err?'':`<div class="row" style="margin-top:6px;gap:4px"><button class="btn sm ghost" data-act="toCards" data-i="${i}">${ic(I.plus)}카드로 만들기</button><button class="btn sm ghost" data-act="speakMsg" data-i="${i}">${ic(I.volume)}</button></div>`}</div>`).join('')
   +(TUTOR.busy?`<div class="msg a"><span class="spin"></span></div>`:'');
   box.scrollTop=box.scrollHeight;
@@ -834,6 +923,7 @@ async function tutorSend(given){
       let s=Math.max(0,TUTOR.hist.length-30);while(s>0&&TUTOR.hist[s].role!=='user')s--; // 도구 메시지 중간에서 자르지 않음
       const r=await callLLM([{role:'system',content:TUTOR_SYS},...TUTOR.hist.slice(s)],{tools});
       if(!r.calls?.length){out=r.text;break}
+      if(step===5){out=r.text||'(도구가 너무 오래 걸려 우선 여기까지의 답으로 정리합니다)';break} // 마지막엔 도구 없이 답 확정
       TUTOR.hist.push({role:'assistant',content:r.text||null,tool_calls:r.calls});
       for(const c of r.calls){
         TUTOR.msgs.push({role:'t',text:'도구 실행: '+(MCP_MAP[c.function.name]?.name||c.function.name)});drawMsgs();
@@ -864,12 +954,17 @@ function vStats(){
   for(let i=6;i>=0;i--){const t=noon-i*DAY;past.push([i?W[new Date(t).getDay()]:'오늘',S.log[dayKey(t)]?.n||0])}
   for(let i=0;i<7;i++){const a=sod+i*DAY;fut.push([i?W[new Date(a+DAY/2).getDay()]:'오늘',S.cards.filter(c=>c.last&&(i===0||c.due>=a)&&c.due<a+DAY).length])}
   const weak=weakCards(10);
+  // 유형별 카드 분포
+  const byType={basic:0,cloze:0,vocab:0};S.cards.forEach(c=>{byType[c.type]=(byType[c.type]||0)+1});
   M(`<div class="head"><div><h1>통계</h1><div class="sub">꾸준함이 기억을 만듭니다</div></div></div>
   <div class="grid" style="margin-bottom:14px">${statBox('전체 카드',S.cards.length,'study')}${statBox('학습한 카드',S.cards.filter(c=>c.last).length,'check')}${statBox('30일 정답률',n30?Math.round(ok30/n30*100)+'%':'-','chart')}${statBox('연속 학습',streak()+'일','flame')}</div>
   <div class="card" style="margin-bottom:14px"><h2>${ic(I.flame)}학습 기록 (26주)</h2><div class="heat">${heat.join('')}</div></div>
   <div class="two" style="margin-bottom:14px"><div class="card"><h2>${ic(I.chart)}최근 7일</h2>${bars(past)}</div><div class="card"><h2>${ic(I.clock)}복습 예정</h2>${bars(fut)}</div></div>
+  ${S.cards.length?`<div class="card" style="margin-bottom:14px"><h2>${ic(I.study)}유형별 구성</h2>
+    <div class="pills">${Object.entries(TYPES).map(([k,v])=>`<span class="pill a">${v} ${byType[k]||0}장</span>`).join('')}</div>
+    <div class="progress" style="margin-top:10px">${Object.entries(TYPES).map(([k,v],i)=>`<i style="float:left;width:${(byType[k]||0)/S.cards.length*100}%;margin-left:${Object.entries(TYPES).slice(0,i).reduce((a,[kk])=>a+(byType[kk]||0)/S.cards.length*100,0)}%;background:${['var(--accent)','#818cf8','#a5b4fc'][i]||'var(--accent)'}"></i>`).join('')}</div></div>`:''}
   <div class="card"><h2 style="justify-content:space-between"><span class="row" style="gap:8px">${ic(I.alert)}약한 카드</span>${weak.length?`<button class="btn sm" data-act="weakAsk">${ic(I.spark)}AI 암기법 받기</button>`:''}</h2>
-  ${weak.length?`<div class="list">${weak.map(c=>`<div class="item"><div class="tx"><div class="f">${esc(prev(c.front))}</div><div class="b">${esc(ansText(c))}</div></div><span class="pill r">틀림 ${c.lapses}</span><button class="icon-btn" data-act="editCard" data-id="${c.id}">${ic(I.edit)}</button></div>`).join('')}</div>`:'<div class="empty">아직 약한 카드가 없어요</div>'}</div>`);
+  ${weak.length?`<div class="list">${weak.map(c=>`<div class="item"><div class="tx"><div class="f">${esc(prev(c.front))}</div><div class="b">${esc(ansText(c))}</div></div><span class="pill r">틀림 ${c.lapses}</span><button class="icon-btn" data-act="editCard" data-id="${esc(c.id)}">${ic(I.edit)}</button></div>`).join('')}</div>`:'<div class="empty">아직 약한 카드가 없어요</div>'}</div>`);
 }
 
 /* ---------- 설정 ---------- */
@@ -878,7 +973,7 @@ function vSettings(){
   const sel=(path,val,opts,re)=>`<select data-set="${path}" ${re?'data-rerender':''}>${Object.entries(opts).map(([k,v])=>`<option value="${k}" ${k===val?'selected':''}>${esc(Array.isArray(v)?v[0]:v)}</option>`).join('')}</select>`;
   const mcpList=s.mcp.map(x=>{const st=MCP[x.id]||{};return `<div class="item"><div class="tx"><div class="f">${esc(x.name)}</div><div class="b">${esc(x.url)}</div></div>
     <span class="pill ${st.tools?'g':st.err?'r':''}">${st.tools?'도구 '+st.tools.length+'개':st.err?'오류':'미연결'}</span>
-    <button class="btn sm" data-act="mcpConn" data-id="${x.id}">${ic(I.plug)}연결</button><button class="icon-btn" data-act="mcpDel" data-id="${x.id}">${ic(I.trash)}</button></div>`}).join('');
+    <button class="btn sm" data-act="mcpConn" data-id="${esc(x.id)}">${ic(I.plug)}연결</button><button class="icon-btn" data-act="mcpDel" data-id="${esc(x.id)}">${ic(I.trash)}</button></div>`}).join('');
   M(`<div class="head"><div><h1>설정</h1><div class="sub">모든 설정과 API 키는 이 기기의 브라우저에만 저장됩니다</div></div>${deferredPrompt?`<button class="btn" data-act="install">${ic(I.download)}앱 설치</button>`:''}</div>
   <div class="stack">
   <div class="card"><h2>${ic(I.spark)}AI API</h2>
@@ -902,12 +997,21 @@ function vSettings(){
   <div class="card"><h2>${ic(I.study)}학습</h2>
     <div class="two">${fld('하루 새 카드 수',inp('newPerDay',s.newPerDay,'20','number'))}${fld('기본 학습 방식',sel('mode',s.mode,{flash:'플래시카드',quiz:'객관식',type:'직접 입력'}))}</div>
     ${fld('음성 언어',sel('ttsLang',s.ttsLang,{auto:'자동 감지','ko-KR':'한국어','en-US':'영어 (미국)','en-GB':'영어 (영국)','ja-JP':'일본어','zh-CN':'중국어','es-ES':'스페인어','fr-FR':'프랑스어','de-DE':'독일어'}))}</div>
+  <div class="card"><h2>${ic(I.clock)}뽀모도로</h2>
+    <div class="two">${fld('집중 시간 (1~180분)',inp('pmWork',s.pmWork??25,'25','number'))}${fld('휴식 시간 (1~60분)',inp('pmBreak',s.pmBreak??5,'5','number'))}</div>
+    <label class="toggle ${s.pmNotify?'on':''}" style="margin:0"><input type="checkbox" data-set="pmNotify" class="chk" ${s.pmNotify?'checked':''}>${ic(I.bulb)}알림 소리 + 브라우저 알림</label>
+    <div class="sub" style="margin-top:8px">브라우저 알림을 켜면 탭이 뒤로 가 있어도 집중·휴식 종료 시 알림이 옵니다. 설정 변경은 다음 판부터 적용됩니다.</div></div>
   <div class="card"><h2>${ic(I.download)}데이터</h2>
     <div class="sub" style="margin-bottom:12px">백업 파일에는 카드, 학습 기록, 설정(API 키 포함)이 들어갑니다. 다른 사람에게 공유하지 마세요.</div>
     <div class="row"><button class="btn" data-act="exportAll">${ic(I.download)}백업 내보내기</button>
-    <label class="btn" style="margin:0">${ic(I.upload)}백업 복원<input type="file" id="bkFile" accept=".json,application/json" hidden></label>
-    <button class="btn danger" data-act="resetAll">${ic(I.trash)}전체 초기화</button></div></div>
+    <button class="btn" data-act="exportEnc">${ic(I.gear)}암호화 백업</button>
+    <label class="btn" style="margin:0">${ic(I.upload)}백업 복원<input type="file" id="bkFile" accept=".json,application/json,.bin" hidden></label>
+    <button class="btn danger" data-act="resetAll">${ic(I.trash)}전체 초기화</button></div>
+    <div class="two" style="margin-top:12px"><div class="field"><label>자동 백업 (이 브라우저)</label>
+      <label class="toggle ${s.autoBk?.on?'on':''}" style="margin:0;height:42px;border-radius:10px"><input type="checkbox" id="abOn" class="chk" ${s.autoBk?.on?'checked':''}>${ic(I.clock)}주기적으로 자동 저장</label></div><div></div></div>
+    <div id="abWrap"></div></div>
   </div>`);
+  renderAutoBk();
 }
 
 /* ================= 8. 이벤트 (위임 방식) ================= */
@@ -915,9 +1019,12 @@ function setPath(p,v){
   const k=p.split('.');let o=S.settings;
   while(k.length>1)o=o[k.shift()];
   if(p==='newPerDay')v=Math.max(0,Math.min(9999,parseInt(v)||0));
+  if(p==='pmWork'){v=Math.min(180,Math.max(1,parseInt(v)||25));S.settings.pmBreak=Math.min(S.settings.pmBreak??5,60);PM_LEN.work=v*60;if(!PM.run&&PM.mode==='work')PM.left=v*60}
+  if(p==='pmBreak'){v=Math.min(60,Math.max(1,parseInt(v)||5));PM_LEN.break=v*60;if(!PM.run&&PM.mode==='break')PM.left=v*60}
   o[k[0]]=v;
   if(p==='ai.provider'){const pr=AI_PRESETS[v];if(pr&&v!=='custom'){S.settings.ai.base=pr[1];S.settings.ai.model=pr[2]}}
   save();
+  if(p==='pmWork'||p==='pmBreak'){pmSave();pmDraw()}
 }
 const csvCell=v=>'"'+String(v??'').replace(/\r?\n/g,' ').replace(/"/g,'""')+'"';
 
@@ -949,7 +1056,7 @@ const ACT={
   doImport:()=>doImport(),
   exportDeck:({id})=>{
     const d=S.decks.find(x=>x.id===id);if(!d)return;
-    const rows=[['앞면','뒷면','힌트'],...S.cards.filter(c=>c.deck===id).map(c=>[c.front,c.back,c.hint])];
+    const rows=[['앞면','뒷면','힌트','유형'],...S.cards.filter(c=>c.deck===id).map(c=>[c.front,c.back,c.hint,TYPES[c.type]||c.type])];
     download(d.name.replace(/[\\/:*?"<>|]/g,'_')+'.csv','\ufeff'+rows.map(r=>r.map(csvCell).join(',')).join('\r\n'),'text/csv;charset=utf-8');
   },
   reveal:()=>{if(ST&&!ST.show){ST.show=true;drawStudy()}},
@@ -984,7 +1091,7 @@ const ACT={
   quick:({i})=>{const t=$('#tIn');if(!t)return;t.value=QUICK[+i][1];t.focus();t.setSelectionRange(t.value.length,t.value.length)},
   send:()=>tutorSend(),
   weakAsk:()=>weakAsk(),
-  toCards:({i})=>{const m=TUTOR.msgs[+i];if(!m)return;Object.assign(GEN,{src:m.text,items:[]});toast('내용을 넣었어요. 카드 생성하기를 누르세요');go('#gen')},
+  toCards:({i})=>{const m=TUTOR.msgs[+i];if(!m)return;syncGen();Object.assign(GEN,{src:m.text,items:[]});toast('내용을 넣었어요. 카드 생성하기를 누르세요');go('#gen')},
   speakMsg:({i})=>{const m=TUTOR.msgs[+i];if(m)speak(plainText(md(m.text)))},
   testAI:async(d,el)=>{
     el.disabled=true;
@@ -1040,22 +1147,31 @@ document.addEventListener('input',e=>{
 document.addEventListener('change',async e=>{
   const t=e.target;
   if(t.dataset.set){setPath(t.dataset.set,t.value);if(t.hasAttribute('data-rerender'))vSettings();return}
-  if(t.dataset.gi!=null){const x=GEN.items[+t.dataset.gi];if(x)x.on=t.checked;syncGen();vGen();return}
+  if(t.dataset.gi!=null){const x=GEN.items[+t.dataset.gi];if(x)x.on=t.checked;vGen();return}
   if(t.id==='gWeb'){GEN.web=t.checked;t.closest('.toggle')?.classList.toggle('on',t.checked);return}
-  if(t.id==='imFile'){
-    const f=t.files[0];if(!f)return;
-    try{$('#imText').value=await f.text();toast('파일 내용을 불러왔어요. 가져오기를 누르세요')}catch{toast('파일을 읽을 수 없습니다')}
-    return;
-  }
+  if(t.id==='abOn'){ACT.abToggle();return}
+  if(t.id==='abDays'){ACT.abDays();return}
+  if(t.id==='abPw'){ACT.abPw();return}
+  if(t.id==='imFile'){await importFiles(t.files);return}
   if(t.id==='bkFile'){
     const f=t.files[0];t.value='';if(!f)return;
-    const d=safeJSON(await f.text().catch(()=>''));
-    if(!d||!Array.isArray(d.decks)||!Array.isArray(d.cards))return toast('올바른 MemoryAll 백업 파일이 아닙니다');
-    if(!confirm(`덱 ${d.decks.length}개, 카드 ${d.cards.length}장으로 현재 데이터를 덮어쓸까요?`))return;
-    try{localStorage.setItem(KEY,JSON.stringify(d))}catch{return toast('저장 공간이 부족합니다')}
-    load();save();GEN=GEN0();TUTOR=TUTOR0();toast('복원 완료');go('#home');
+    let txt='';try{txt=await f.text()}catch{return toast('파일을 읽을 수 없습니다')}
+    if(txt.startsWith(ENC_MAGIC)){askPw(async pw=>{try{restoreBackup(safeJSON(await decryptText(pw,txt)))}catch{toast('복호화에 실패했습니다. 비밀번호를 확인하세요',4000)}});return}
+    const d=detectImport(txt,f.name);
+    if(d&&d.k==='json'&&Array.isArray(d.data)&&Array.isArray(d.data.cards)){restoreBackup(d.data);return}
+    if(d&&d.k==='cards'){ // 카드 배열/CSV → 가져오기로 처리
+      let dk='';
+      if(S.decks.length===1)dk=S.decks[0].id;
+      else{const dd={id:uid(),name:'가져온 카드 '+dayKey(),created:Date.now()};S.decks.push(dd);dk=dd.id}
+      d.data.forEach(c=>S.cards.push(newCard(dk,c.front,c.back,c.hint,c.type)));
+      save();toast(d.data.length+'장 가져왔어요');go('#deck/'+encodeURIComponent(dk));return;
+    }
+    toast('올바른 MemoryAll 백업·카드 파일이 아닙니다');
   }
 });
+
+// 다른 탭에서 바꾼 데이터 실시간 동기화 (multi-tab)
+
 
 // 키보드 단축키
 document.addEventListener('keydown',e=>{
@@ -1069,7 +1185,15 @@ document.addEventListener('keydown',e=>{
   }
   if(t.id==='typeIn'&&e.key==='Enter'){e.preventDefault();checkType();return}
   if(t.id==='tIn'&&e.key==='Enter'&&!e.shiftKey){e.preventDefault();tutorSend();return}
-  if(/INPUT|TEXTAREA|SELECT/.test(tag)||e.ctrlKey||e.metaKey||e.altKey||!ST||!curCard())return;
+  // 튜터 화면: Esc로 입력창 blur (모바일에서 키보드 닫기 후에도 단축키 사용 가능)
+  if(!ST&&t.id==='tIn'&&e.key==='Escape'){t.blur();return}
+  if(/INPUT|TEXTAREA|SELECT/.test(tag)||e.ctrlKey||e.metaKey||e.altKey)return;
+  // 학습 중이 아닌 화면(튜터 포함)에서도 S = 마지막 AI 답변 듣기
+  if(!ST){
+    if(curRoute()[0]==='tutor'&&e.code==='KeyS'){const m=[...TUTOR.msgs].reverse().find(x=>x.role==='a');if(m)speak(plainText(md(m.text)));return}
+    return;
+  }
+  if(!curCard())return;
   if(tag==='BUTTON'&&(e.key===' '||e.key==='Enter'))return; // 버튼 기본 클릭과 중복 방지
   if(e.key===' '||e.key==='Enter'){e.preventDefault();if(!ST.show)ACT.reveal();return}
   const n=+e.key;
@@ -1111,9 +1235,398 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden&&PM.run)pm
 if('serviceWorker' in navigator)navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister())).catch(()=>{});
 if(window.caches)caches.keys().then(ks=>ks.forEach(k=>{if(k.startsWith('memoryall'))caches.delete(k)})).catch(()=>{});
 
+/* ================= 10. 확장 기능 (검색 · 단축키 · 백업 보호 · 오프라인 생성 · 자동 백업) ================= */
+
+/* 전역 검색 (덱·카드 · Ctrl/Cmd+K) */
+let GS='';
+function globalSearch(){
+  const q=GS.trim().toLowerCase();if(!q)return[];
+  const out=[];
+  for(const d of S.decks)if(d.name.toLowerCase().includes(q))out.push({t:'deck',id:d.id,label:d.name,sub:'덱'});
+  for(const c of S.cards.slice(0,3000)){ // 대형 라이브러리에서도 빠르게
+    if(String(c.front||'').toLowerCase().includes(q)||String(c.back||'').toLowerCase().includes(q)||String(c.hint||'').toLowerCase().includes(q)){
+      const d=S.decks.find(x=>x.id===c.deck);out.push({t:'card',id:c.id,deck:c.deck,label:prev(c.front).slice(0,80),sub:(d?d.name:'')+' · 카드'});
+    }
+    if(out.length>=40)break;
+  }
+  return out;
+}
+function drawGSearch(){
+  const box=$('#gsList');if(!box)return;
+  const res=globalSearch();
+  box.innerHTML=res.length?res.map((x,i)=>`<div class="item" style="cursor:pointer" data-act="gsGo" data-t="${x.t}" data-id="${esc(x.id)}" data-deck="${esc(x.deck||x.id)}"><div class="tx"><div class="f">${esc(x.label)}</div><div class="b">${esc(x.sub)}</div></div><span class="pill">${i+1}</span></div>`).join('')
+    :`<div class="empty" style="padding:20px">${GS.trim()?'검색 결과가 없어요':'Ctrl+K · 덱과 카드를 검색하세요'}</div>`;
+}
+function searchModal(){
+  GS='';
+  openModal(`<h2>${ic(I.search)}<span>전체 검색</span>${closeBtn()}</h2>
+  <input id="gsIn" placeholder="카드 앞면·뒷면·힌트, 덱 이름 검색" autocomplete="off">
+  <div class="list" id="gsList" style="margin-top:8px;max-height:50vh;overflow-y:auto"></div>`);
+  drawGSearch();setTimeout(()=>$('#gsIn')?.focus(),50);
+}
+function helpModal(){
+  const rows=[['Space / Enter','정답 보기'],['1 ~ 4','평가 (다시·어려움·좋음·쉬움)'],[(isDesktop()?'Q / W / E / R':'스와이프'),'객관식 선택'],['H','힌트'],['S','듣기 (튜터 화면: 마지막 답변)'],['← / →','학습 건너뛰기'],['N','새 카드 추가'],['D','현재 카드 삭제'],['Esc','모달 닫기 / 입력창 해제'],['Ctrl(Cmd)+K','전체 검색'],['?','이 도움말']];
+  openModal(`<h2>${ic(I.bulb)}<span>단축키 도움말</span>${closeBtn()}</h2>
+  <div class="list">${rows.map(([k,l])=>`<div class="item"><div class="tx"><div class="f">${esc(k)}</div></div><div class="b" style="white-space:normal">${esc(l)}</div></div>`).join('')}</div>
+  <div class="sub" style="margin-top:10px">한글 입력 중(조합 중)에는 단축키가 동작하지 않습니다.</div>`);
+}
+
+/* 데이터 파일 형식 감지 후 가져오기 (Anki TSV/CSV · JSON 백업 · 일반 텍스트) */
+function detectImport(text,name){
+  const t=String(text??'').replace(/^\ufeff/,''),head=t.trimStart().slice(0,1);
+  if(head==='{'||head==='['){const j=safeJSON(t);if(j&&(Array.isArray(j)?j.some(x=>x&&x.front):Array.isArray(j.cards)))return{k:'json',data:j}}
+  const lines=t.replace(/\r/g,'').split('\n').filter(l=>l.trim());
+  const sep=lines[0]?.includes('\t')?'\t':lines[0]?.includes(';')&&!lines[0].includes(',')?';':',';
+  const rows=(sep===','?lines.map(csvRow):lines.map(l=>l.split(sep).map(x=>x.trim()))).filter(r=>r[0]);
+  const hdr=i=>/^front$|^앞면$|^question$|^질문$/i.test(String(rows[i]?.[0]||'').trim());
+  let type=-1,back=-1,hint=-1;
+  rows.forEach((r,ri)=>{r.forEach((cell,ci)=>{const s=cell.trim().toLowerCase();
+    if(s==='type'&&type<0&&ri<=1&&ci>=2)type=ci;
+    if(ci>0&&(s==='back'||s==='뒷면'||s==='answer'||s==='답')&&back<0)back=ci;
+    if(ci>0&&(s==='hint'||s==='예문'||s==='example'||s==='코멘트'||s==='comment')&&hint<0)hint=ci;})});
+  if(hdr(0)&&back<0)back=1;if(hdr(0)&&type>=0&&type!==1)back=type===2?1:2;
+  if(back<0)back=1;
+  const clean=s=>String(s??'').replace(/^[#\/\/]+\s*/,'').trim();
+  const cards=[];
+  for(const r of rows){
+    const f=clean(r[0]);if(!f)continue;
+    if(hdr(rows.indexOf(r)))continue;
+    let ty=['basic','cloze','vocab'].includes(type>-1?clean(r[type]):'')?(clean(r[type]).toLowerCase()==='cloze'?'cloze':clean(r[type]).toLowerCase()==='vocab'?'vocab':'basic'):(/\{\{.+?\}\}/.test(f)?'cloze':'basic');
+    cards.push({front:f,back:ty==='cloze'?'':clean(r[back]||''),hint:clean(hint>-1?r[hint]:(r[back+1]||'')),type:ty});
+  }
+  return cards.length?{k:'cards',data:cards}:null;
+}
+async function importFiles(files){
+  const fs=[...files];if(!fs.length)return;
+  const jsons=[],cards=[];let errs=0;
+  for(const f of fs){
+    let txt='';try{txt=await f.text()}catch{errs++;continue}
+    try{
+      const d=detectImport(txt,f.name);
+      if(!d){errs++;continue}
+      if(d.k==='json'){
+        if(Array.isArray(d.data))d.data.forEach(x=>{if(x&&x.front)cards.push({front:String(x.front),back:String(x.back??''),hint:String(x.hint??''),type:['basic','cloze','vocab'].includes(x.type)&&(/\{\{.+?\}\}/.test(x.front)||x.type!=='cloze')?x.type:(/\{\{.+?\}\}/.test(x.front)?'cloze':'basic')})});
+        else if(Array.isArray(d.data.cards))jsons.push(d.data);
+      }else cards.push(...d.data);
+    }catch{errs++}
+  }
+  // JSON 백업 파일은 별도 복원 경로로 (설정까지 있는 경우 확인)
+  if(jsons.length){restoreBackup(jsons[0]);return}
+  if(!cards.length)return toast(errs?'읽을 수 있는 카드가 없습니다':'파일을 해석할 수 없습니다',4000);
+  const box=$('#imText');
+  if(box){ // 모달 열림 → 미리보기 채움 (기존 방식 유지)
+    box.value=cards.map(c=>[c.front,c.back,c.hint].map(csvCell).join(',')).join('\n');
+    toast(`파일 ${fs.length}개 → 카드 ${cards.length}개 변환${errs?` · 실패 ${errs}개`:''}. 가져오기를 누르세요`,4000);return;
+  }
+  // 모달 밖(드래그&드롭) → 즉시 가져오기
+  let dk='';
+  if(S.decks.length===1)dk=S.decks[0].id;
+  else{const d={id:uid(),name:'가져온 카드 '+dayKey(),created:Date.now()};S.decks.push(d);dk=d.id}
+  cards.forEach(c=>S.cards.push(newCard(dk,c.front,c.back,c.hint,c.type)));
+  save();toast(`카드 ${cards.length}장 가져왔어요${errs?` · 실패 ${errs}개`:''}`);go('#deck/'+encodeURIComponent(dk));
+}
+
+/* 백업 암호화(AES-GCM) · 검증 헤더 */
+const ENC_MAGIC='MemoryAll-Enc-v1:';
+const PW_SESSION={pw:null};
+async function deriveKey(pw,salt){
+  const enc=new TextEncoder();
+  const km=await crypto.subtle.importKey('raw',enc.encode(pw),'PBKDF2',false,['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:15e4,hash:'SHA-256'},km,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
+}
+async function encryptText(pw,plain){
+  const salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12));
+  const key=await deriveKey(pw,salt);
+  const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},key,new TextEncoder().encode(plain)));
+  const blob=new Uint8Array(salt.length+iv.length+ct.length);blob.set(salt,0);blob.set(iv,16);blob.set(ct,28);
+  return ENC_MAGIC+btoa(String.fromCharCode(...blob.subarray(0,4096)))+'@'+btoa(String.fromCharCode(...blob.subarray(4096)));
+}
+async function decryptText(pw,text){
+  const b64=String(text).slice(ENC_MAGIC.length).replace('@','');
+  const bin=Uint8Array.from(atob(b64),c=>c.charCodeAt(0));
+  const salt=bin.subarray(0,16),iv=bin.subarray(16,28),ct=bin.subarray(28);
+  const key=await deriveKey(pw,salt);
+  return new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv},key,ct));
+}
+function pwModal(onOk){
+  openModal(`<h2>${ic(I.gear)}<span>백업 비밀번호</span>${closeBtn()}</h2>
+  ${fld('비밀번호 (8자 이상)',`<input id="bkPw1" type="password" autocomplete="new-password">`)}
+  ${fld('비밀번호 확인',`<input id="bkPw2" type="password" autocomplete="new-password">`)}
+  <div class="sub" style="margin-bottom:12px">암호화되지 않으면 이 기기에 저장된 그대로의 JSON이 나갑니다. API 키가 들어있으니 주의하세요.</div>
+  <div class="row" style="justify-content:flex-end"><button class="btn" data-act="close">취소</button><button class="btn pri" id="bkPwOk">확인</button></div>`);
+  $('#bkPwOk').onclick=()=>{
+    const a=$('#bkPw1').value,b=$('#bkPw2').value;
+    if(a.length<8)return toast('비밀번호는 8자 이상이어야 합니다');
+    if(a!==b)return toast('비밀번호가 일치하지 않습니다');
+    closeModal();onOk(a);
+  };
+  setTimeout(()=>$('#bkPw1')?.focus(),50);
+}
+function askPw(onOk){
+  openModal(`<h2>${ic(I.gear)}<span>암호화된 백업입니다</span>${closeBtn()}</h2>
+  ${fld('비밀번호',`<input id="bkPwR" type="password" autocomplete="off">`)}
+  <div class="row" style="justify-content:flex-end"><button class="btn" data-act="close">취소</button><button class="btn pri" id="bkPwOk">복호화</button></div>`);
+  const go2=()=>{const v=$('#bkPwR').value;if(!v)return toast('비밀번호를 입력하세요');closeModal();onOk(v)};
+  $('#bkPwOk').onclick=go2;
+  $('#bkPwR').addEventListener('keydown',e=>{if(e.key==='Enter')go2()});
+  setTimeout(()=>$('#bkPwR')?.focus(),50);
+}
+async function exportEnc(pw){
+  const salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12));
+  const key=await deriveKey(pw,salt);
+  const pt=new TextEncoder().encode(JSON.stringify(S));
+  const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},key,pt));
+  const blob=new Uint8Array(salt.length+iv.length+ct.length);blob.set(salt,0);blob.set(iv,16);blob.set(ct,28);
+  download(`memoryall-backup-${dayKey()}-encrypted.bin`,String.fromCharCode(...blob),'application/octet-stream');
+  toast('암호화된 백업을 내보냈어요 (복원 시 같은 파일 선택 + 비밀번호)');
+}
+async function restoreBackup(d){ // JSON 백업 객체를 검증 후 복원
+  if(!d||!Array.isArray(d.decks)||!Array.isArray(d.cards))return toast('올바른 MemoryAll 백업 파일이 아닙니다');
+  if(!confirm(`덱 ${d.decks.length}개, 카드 ${d.cards.length}장으로 현재 데이터를 덮어쓸까요?`))return;
+  try{localStorage.setItem(KEY,JSON.stringify(d));bumpVer()}catch{return toast('저장 공간이 부족합니다')}
+  load();save();GEN=GEN0();TUTOR=TUTOR0();PW_SESSION.pw=null;toast('복원 완료');go('#home');
+}
+
+/* 오프라인 카드 생성 (AI 없이 제목에서 기본 카드 만들기) */
+function offlineGen(){
+  syncGen();
+  const src=GEN.src.trim();if(!src)return toast('주제나 자료를 입력하세요');
+  const n=GEN.count,rule=/[가-힣]/.test(src)?/[.,!?;\n]+/g:/\.\s+|\n/;
+  const lines=src.split(rule).map(x=>x.trim()).filter(x=>x.length>=4);
+  if(!lines.length)return toast('문장을 찾지 못했어요. 내용을 더 길게 넣어주세요');
+  GEN.items=lines.slice(0,n).map(s=>{
+    const m=s.match(/^(.{1,40}?)[—:]\s+(.{2,})$/); // "A: B" 형태는 앞/뒤로 분리
+    if(m&&GEN.type!=='cloze')return {type:'basic',front:m[1],back:m[2],hint:'',on:true};
+    return {type:'basic',front:s.slice(0,80)+(s.length>80?'…':''),back:s,hint:'',on:true};
+  });
+  toast('오프라인 생성: 문장에서 '+GEN.items.length+'장 추출 (검토 후 저장하세요)');
+  vGen();
+}
+
+/* 통계 확장 */
+function hourHeat(){
+  const h=new Array(24).fill(0);
+  for(const k in S.log)(S.log[k].hs||[]).forEach(i=>{if(i>=0&&i<24)h[i]++});
+  const mx=Math.max(1,...h);
+  return `<div class="grid" style="grid-template-columns:repeat(12,1fr);gap:4px">${h.map((v,i)=>`<div title="${i}시 · ${v}장" style="height:26px;border-radius:6px;background:${v?`rgba(79,70,229,${(.15+.85*v/mx).toFixed(2)})`:'var(--bg)'};display:flex;align-items:center;justify-content:center;font-size:10px;color:${v/mx>.5?'#fff':'var(--sub)'}">${i}</div>`).join('')}</div>`;
+}
+function deckTable(){
+  if(!S.decks.length)return '';
+  const now=Date.now();
+  return `<div class="list">${S.decks.map(d=>{const cs=S.cards.filter(c=>c.deck===d.id),st=cs.filter(c=>c.last);
+    const acc=st.length?Math.round(st.reduce((a,c)=>a+(c.reps/(c.reps+c.lapses||1)),0)/st.length*100):0;
+    const due=cs.filter(c=>c.last&&c.due<now).length;
+    return `<div class="item"><div class="tx"><div class="f">${esc(d.name)}</div><div class="b">카드 ${cs.length}장 · 평균 반복 ${(st.length?st.reduce((a,c)=>a+c.reps,0)/st.length:0).toFixed(1)}회</div></div><span class="pill ${due?'b':''}">복습 ${due}</span><span class="pill ${acc>=80?'g':acc&&acc<60?'r':''}">${st.length?'정답률 대략 '+acc+'%':'-'} </span></div>`}).join('')}</div>`;
+}
+function forecastData(){
+  const sod=startOfDay(),out=[];
+  for(let i=0;i<30;i++){const a=sod+i*DAY;out.push(S.cards.filter(c=>c.last&&c.due>=a&&c.due<a+DAY).length)}
+  return out;
+}
+function drawFc(id){
+  const el=$(id);if(!el)return;
+  const f=forecastData(),mx=Math.max(1,...f);
+  el.innerHTML=`<div class="bars" style="height:120px">${f.slice(0,14).map((v,i)=>`<div><em>${v||''}</em><b style="height:${v/mx*78}%"></b><span>${i?i+'일후':'오늘'}</span></div>`).join('')}</div>`;
+}
+function exportStatsCsv(){
+  const rows=[['날짜','복습 수','정답','새 카드']];
+  Object.keys(S.log).sort().forEach(k=>rows.push([k,S.log[k].n||0,S.log[k].ok||0,S.log[k].nw||0]));
+  download(`memoryall-stats-${dayKey()}.csv`,'\ufeff'+rows.map(r=>r.map(csvCell).join(',')).join('\r\n'),'text/csv;charset=utf-8');
+}
+
+/* 설정 확장: 백업 주기 · 자동 재생성 끄기 */
+function backupTick(){
+  const cfg=S.settings.autoBk;if(!cfg||!cfg.on||!crypto.subtle)return;
+  const every=(+cfg.days||7)*DAY,last=+cfg.last||0;
+  if(Date.now()-last<every)return;
+  const run=async()=>{
+    try{
+      let text=JSON.stringify(S);
+      if(cfg.pw){try{text=await encryptText(cfg.pw,text)}catch{cfg.pw=null;text=JSON.stringify(S)}}
+      localStorage.setItem('memoryall-autobk',text);
+      cfg.last=Date.now();save();
+      toast('자동 백업을 이 브라우저에 저장했어요 ('+new Date().toLocaleDateString('ko-KR')+')',3500);
+    }catch{toast('자동 백업 실패: 저장 공간 부족. 수동 백업으로 내보내세요',5000);cfg.on=false;save()}
+  };
+  run();
+}
+function renderAutoBk(){
+  const box=$('#abWrap');if(!box)return;
+  const cfg=S.settings.autoBk||{on:false,days:7};
+  box.innerHTML=cfg.on?`<div class="two">${fld('주기',`<select id="abDays">${[1,3,7,30].map(d=>`<option value="${d}" ${(+cfg.days||7)===d?'selected':''}>${d}일마다</option>`).join('')}</select>`)}
+    <div class="field"><label>암호화</label><label class="toggle ${cfg.pw?'on':''}" style="height:42px;border-radius:10px;margin:0"><input type="checkbox" id="abPw" class="chk" ${cfg.pw?'checked':''}>${ic(I.gear)}비밀번호로 암호화</label></div></div>
+    ${cfg.pw?`<div class="sub" style="margin-bottom:8px">설정에 저장된 비밀번호로 암호화됩니다. 분실 시 복구 불가.</div>`:''}
+    <div class="row"><button class="btn sm" data-act="abNow">${ic(I.download)}지금 자동 백업 저장소에</button>
+    <button class="btn sm" data-act="abGet">${ic(I.upload)}브라우저 저장 백업 복원</button>
+    <span class="sub">${cfg.last?'마지막: '+new Date(+cfg.last).toLocaleDateString('ko-KR'):'아직 실행 안 됨'}</span></div>`
+  :`<div class="sub">켜 두면 지정한 주기로 이 브라우저(localStorage)에 백업을 남기고, 백업 화면에서 언제든 복원할 수 있습니다. 파일을 내려받는 수동 백업과 별개로 안전하게 유지됩니다.</div>`;
+}
+
+/* 튜터 대화 이어가기 */
+function saveChat(){
+  if(!TUTOR.msgs.length)return toast('저장할 대화가 없어요');
+  const chats=S.settings.chats||[];
+  const first=TUTOR.msgs.find(m=>m.role==='u');
+  chats.unshift({id:uid(),title:(first?first.text:'대화').slice(0,40),at:Date.now(),msgs:TUTOR.msgs.filter(m=>m.role!=='t').slice(-60)});
+  S.settings.chats=chats.slice(0,10);save();toast('대화를 저장했어요 ('+chats.length+'/10)');
+}
+function chatModal(){
+  const chats=S.settings.chats||[];
+  openModal(`<h2>${ic(I.chat)}<span>저장된 대화</span>${closeBtn()}</h2>
+  ${chats.length?`<div class="list">${chats.map(c=>`<div class="item"><div class="tx"><div class="f">${esc(c.title)}</div><div class="b">${new Date(c.at).toLocaleString('ko-KR')} · ${c.msgs.length}개 메시지</div></div>
+    <button class="btn sm" data-act="chatLoad" data-id="${esc(c.id)}">불러오기</button><button class="icon-btn" data-act="chatDel" data-id="${esc(c.id)}">${ic(I.trash)}</button></div>`).join('')}</div>`:'<div class="empty">저장된 대화가 없어요</div>'}`);
+}
+
+/* 서비스워커 등록 (오프라인 실행용 SW 코드가 포함된 경우에만) */
+(function registerSW(){
+  try{
+    const m=document.querySelector('script[type="service-worker/script"]');
+    if(m&&'serviceWorker' in navigator&&location.protocol!=='file:'){
+      navigator.serviceWorker.register(URL.createObjectURL(new Blob([m.textContent],{type:'text/javascript'}))).catch(()=>{});
+    }
+  }catch{}
+})();
+
+/* ACT 확장 (디자인·기존 동작 그대로, 새 항목만 추가) */
+Object.assign(ACT,{
+  gsearch:()=>searchModal(),
+  gsGo:({t,id,deck})=>{closeModal();if(t==='card'){ACT.cardJump({id,deck})}else go('#deck/'+encodeURIComponent(id))},
+  cardJump:({id,deck})=>{
+    if(!S.cards.some(c=>c.id===id))return toast('카드를 찾을 수 없습니다');
+    location.hash='#study/'+(deck||'all');
+    if(ST){const j=ST.q.indexOf(id);if(j<0)ST.q.unshift(id);ST.i=ST.q.indexOf(id);resetCardState();drawStudy()}
+  },
+  help:()=>helpModal(),
+  genOffline:()=>offlineGen(),
+  exportEnc:()=>pwModal(pw=>{exportEnc(pw).catch(e=>toast(e.message,5000))}),
+  abToggle:()=>{
+    const el=$('#abOn');
+    S.settings.autoBk=S.settings.autoBk||{on:false,days:7};
+    S.settings.autoBk.on=el?!!el.checked:!S.settings.autoBk.on;
+    save();vSettings();if(S.settings.autoBk.on)backupTick();
+  },
+  abDays:()=>{const e=$('#abDays');if(e){S.settings.autoBk=S.settings.autoBk||{on:true};S.settings.autoBk.days=Math.min(30,Math.max(1,+e.value||7));save()}},
+  abPw:()=>{const e=$('#abPw');if(!S.settings.autoBk)return;
+    if(e.checked){pwModal(pw=>{S.settings.autoBk.pw=pw;save();renderAutoBk()})}
+    else{S.settings.autoBk.pw=null;save();renderAutoBk()}},
+  abNow:()=>{const cfg=S.settings.autoBk||{};cfg.last=0;backupTick();renderAutoBk()},
+  abGet:()=>{
+    const raw=localStorage.getItem('memoryall-autobk');if(!raw)return toast('브라우저에 저장된 자동 백업이 없습니다');
+    if(raw.startsWith(ENC_MAGIC)){askPw(async pw=>{try{restoreBackup(safeJSON(await decryptText(pw,raw)))}catch{toast('복호화에 실패했습니다',4000)}});return}
+    const d=safeJSON(raw);
+    if(!d)return toast('자동 백업을 해석할 수 없습니다');
+    restoreBackup(d);
+  },
+  keepChat:()=>saveChat(),
+  chats:()=>chatModal(),
+  chatLoad:({id})=>{
+    const c=(S.settings.chats||[]).find(x=>x.id===id);if(!c)return;
+    TUTOR.msgs=c.msgs.map(m=>({...m}));
+    TUTOR.hist=c.msgs.filter(m=>m.role!=='t').map(m=>({role:m.role==='u'?'user':'assistant',content:m.text})).slice(-30);
+    closeModal();drawMsgs();toast('대화를 불러왔어요');
+  },
+  chatDel:({id})=>{S.settings.chats=(S.settings.chats||[]).filter(x=>x.id!==id);save();chatModal()},
+});
+
+/* 이벤트 보강: 검색 UI · 학습 단축키 · 드래그&드롭 · 병합 동기화 */
+document.addEventListener('input',e=>{if(e.target.id==='gsIn'){GS=e.target.value;drawGSearch()}});
+
+// 다른 탭과 충돌 없이 병합 (같은 키는 최신 수정 우선, 날짜별 로그는 필드 단위 머지)
+function mergeData(a,b){
+  const pick=(x,y)=>{const tx=+(x?.updated||x?.created||0),ty=+(y?.updated||y?.created||0);return ty>tx?y:x};
+  const decks=Object.create(null);[...(a?.decks||[]),...(b?.decks||[])].forEach(d=>{if(d&&d.id)decks[d.id]=decks[d.id]?pick(decks[d.id],d):d});
+  const cards=Object.create(null);[...(a?.cards||[]),...(b?.cards||[])].forEach(c=>{if(c&&c.id)cards[c.id]=cards[c.id]?pick(cards[c.id],c):c});
+  const log=Object.create(null);
+  for(const src of [a?.log,b?.log]){for(const k in (src||{})){const l=src[k]||{};const o=log[k];
+    if(!o){const cp={n:+l.n||0,ok:+l.ok||0,nw:+l.nw||0};if(Array.isArray(l.hs)){const hs=new Array(24).fill(0);l.hs.forEach(v=>{v|=0;if(v>=0&&v<24)hs[v]++});cp.hs=hs}log[k]=cp}
+    else{o.n=Math.max(o.n,+l.n||0);o.ok=Math.max(o.ok,+l.ok||0);o.nw=Math.max(o.nw,+l.nw||0);
+      if(Array.isArray(l.hs)){const hs=o.hs||(o.hs=new Array(24).fill(0));l.hs.forEach(v=>{v|=0;if(v>=0&&v<24)hs[v]++})}}}}
+  const settings=((a?.settings&&typeof a.settings==='object'?a.settings:b?.settings)||{});
+  return {decks:Object.values(decks),cards:Object.values(cards),log,settings};
+}
+window.addEventListener('storage',async e=>{
+  if(e.key!==KEY)return;
+  try{
+    const cur=JSON.parse(localStorage.getItem(KEY)||'null'),inc=JSON.parse(e.newValue||'null');
+    if(cur&&inc)localStorage.setItem(KEY,JSON.stringify(mergeData(cur,inc)));
+  }catch{}
+  const studyId=ST?ST.q[ST.i]:null,studyDeck=ST?ST.deck:null;
+  closeModal();GEN=GEN0();TUTOR=TUTOR0();
+  load(); // 새 데이터를 디스크에서 다시 읽어온 뒤 현재 화면 유지
+  const [r,arg]=curRoute();
+  if(r==='study'){startStudy(studyDeck||'all');if(ST&&studyId){const j=ST.q.indexOf(studyId);if(j>-1)ST.i=j}drawStudy()}
+  else route();
+  toast('다른 탭의 변경을 반영했어요');
+});
+
+// 키보드 단축키 (기존 핸들러 이후에 병합: 검색·도움말·학습 편의키)
+document.addEventListener('keydown',e=>{
+  if(e.isComposing||e.keyCode===229)return;
+  const mod=e.ctrlKey||e.metaKey,t=e.target,tag=t.tagName;
+  if(mod&&e.code==='KeyK'){e.preventDefault();if(!$('#modalBg').classList.contains('show'))searchModal();return}
+  if(mod||e.altKey)return;
+  if(!$('#modalBg').classList.contains('show')&&e.key==='?'&&!(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT')){e.preventDefault();helpModal();return}
+  if(ST&&!$('#modalBg').classList.contains('show')&&!(tag==='INPUT'||tag==='TEXTAREA'||tag==='BUTTON')){
+    if(e.key==='ArrowRight'){e.preventDefault();if(ST.show)grade(3);else{ST.i++;resetCardState();drawStudy()}return}
+    if(e.key==='ArrowLeft'){e.preventDefault();ST.i=Math.max(0,ST.i-1);resetCardState();drawStudy();return}
+    if(e.code==='KeyN'){e.preventDefault();const c=curCard();ACT.addCard({id:ST.deck||(c&&c.deck)||''});return}
+    if(e.code==='KeyD'&&curCard()){e.preventDefault();ACT.delCard({id:curCard().id});return}
+    if(isDesktop()&&e.code==='KeyQ'&&ST.mode==='quiz'&&!ST.show&&ST.choices&&ST.choices[0]!=null){e.preventDefault();pick(0);return}
+    if(isDesktop()&&e.code==='KeyW'&&ST.mode==='quiz'&&!ST.show&&ST.choices&&ST.choices[1]!=null){e.preventDefault();pick(1);return}
+    if(isDesktop()&&e.code==='KeyE'&&ST.mode==='quiz'&&!ST.show&&ST.choices&&ST.choices[2]!=null){e.preventDefault();pick(2);return}
+    if(isDesktop()&&e.code==='KeyR'&&ST.mode==='quiz'&&!ST.show&&ST.choices&&ST.choices[3]!=null){e.preventDefault();pick(3);return}
+  }
+});
+
+// 파일 드래그&드롭 → 가져오기 모달
+let dragN=0;
+window.addEventListener('dragenter',e=>{if(e.dataTransfer&&[...e.dataTransfer.types].includes('Files')){e.preventDefault();dragN++;toast('놓으면 가져옵니다',1500)}});
+window.addEventListener('dragover',e=>{if(e.dataTransfer&&[...e.dataTransfer.types].includes('Files'))e.preventDefault()});
+window.addEventListener('dragleave',()=>{dragN=Math.max(0,dragN-1)});
+window.addEventListener('drop',e=>{
+  dragN=0;
+  const fs=e.dataTransfer?.files;
+  if(fs&&fs.length){e.preventDefault();importFiles(fs);return}
+  // 텍스트 선택 드래그 → 붙여넣기 지원은 생략 (파일만 처리)
+});
+
+/* 초기화 보강 */
+(function initExt(){
+  // 내 ID (병합 시 로컬 우선)
+  if(!S.deviceId){S.deviceId=uid();try{localStorage.setItem(KEY,JSON.stringify(S))}catch{}}
+  // 헤더·내비·탭바에 검색 버튼
+  try{
+    const hb=$('.side .grow');
+    if(hb&&!$('#sideSearch'))hb.insertAdjacentHTML('beforebegin','<a class="nav" id="sideSearch" href="#" data-act="gsearch">'+ic(I.search)+'검색 <span class="kbd" style="margin-left:auto">Ctrl K</span></a>');
+    const tb=document.querySelector('.topbar .row');
+    if(tb&&!$('#topSearch'))tb.insertAdjacentHTML('afterbegin','<button class="icon-btn" id="topSearch" data-act="gsearch" title="검색">'+ic(I.search)+'</button>');
+    const tab=$('#tabbar');
+    if(tab&&tab.children.length===5)tab.insertAdjacentHTML('beforeend','<a href="#" data-act="gsearch">'+ic(I.search)+'<span>검색</span></a>');
+    if(tab&&tab.children.length===6)tab.style.gridTemplateColumns='repeat(6,1fr)';
+  }catch{}
+  // 홈 화면에 도움말 버튼
+  const _vHome=vHome;
+  vHome=function(){_vHome();const hd=$('#main .head .row');if(hd)hd.insertAdjacentHTML('afterbegin','<button class="btn" data-act="help" title="단축키 도움말">'+ic(I.bulb)+'</button>')};
+  // 통계 화면에 새 패널 연결
+  const _vStats=vStats;
+  vStats=function(){_vStats();const main=$('#main');if(!main)return;
+    main.insertAdjacentHTML('beforeend',
+      `<div class="card" style="margin-top:14px"><h2 style="justify-content:space-between"><span class="row" style="gap:8px">${ic(I.study)}덱별 현황</span><button class="btn sm" data-act="expStats">${ic(I.download)}통계 CSV</button></h2>${deckTable()}</div>
+       <div class="card" style="margin-top:14px"><h2>${ic(I.chart)}향후 2주 복습 예상</h2><div id="fcBox"></div></div>
+       <div class="card" style="margin-top:14px"><h2>${ic(I.clock)}시간대별 학습 분포</h2>${hourHeat()}</div>`);
+    drawFc('#fcBox');
+  };
+  // 백업 주기 체크
+  backupTick();
+})();
+
+/* 통계 CSV 버튼 액트 */
+Object.assign(ACT,{expStats:()=>exportStatsCsv()});
+
+
 load();
+pmLoad();pmDraw();
 $('#topSet').innerHTML=ic(I.gear);
-pmDraw();
 route();
 </script>
 </body>
