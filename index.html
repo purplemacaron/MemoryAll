@@ -44,6 +44,12 @@
 <style>
 /* 1. 디자인 토큰 */
 :root{--bg:#f6f7f9;--panel:#fff;--line:#e7e9ee;--text:#16181d;--sub:#6b7280;--accent:#4f46e5;--accent-soft:#eef2ff;--green:#10b981;--red:#ef4444;--blue:#3b82f6;--amber:#f59e0b;--r:14px;--sh:0 1px 2px rgba(16,24,40,.04),0 1px 3px rgba(16,24,40,.06)}
+body.dark{--bg:#0f1218;--panel:#171a21;--line:#262b36;--text:#e7eaf0;--sub:#9aa3b2;--accent:#818cf8;--accent-soft:#232a45;--sh:0 1px 2px rgba(0,0,0,.3),0 1px 3px rgba(0,0,0,.4)}
+body.dark code{background:#232834}
+body.dark .heat i{background:#232834}
+body.dark .heat i.l1{background:#374151}.heat i.l2,body.dark .heat i.l2{background:#4f5b93}
+body.dark .tagchip:hover{border-color:#3a4152}
+body.dark .selbar{border-color:#3a4152}
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
 body{font-family:Pretendard,-apple-system,BlinkMacSystemFont,system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:14.5px;line-height:1.55;-webkit-font-smoothing:antialiased}
@@ -155,6 +161,15 @@ label{display:block;font-size:13px;font-weight:600;color:var(--sub);margin-botto
 .heat{display:grid;grid-template-rows:repeat(7,12px);grid-auto-flow:column;grid-auto-columns:12px;gap:3px;overflow-x:auto;padding-bottom:4px}
 .heat i{border-radius:3px;background:#eef0f4}
 .heat i.l1{background:#c7d2fe}.heat i.l2{background:#818cf8}.heat i.l3{background:#6366f1}.heat i.l4{background:#4338ca}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+.cal-grid u{text-align:center;font-size:11px;color:var(--sub);font-weight:700;text-decoration:none;padding:2px 0}
+.cal-grid>div{min-height:52px;border-radius:9px;background:var(--bg);border:1px solid transparent;padding:5px 6px;display:flex;flex-direction:column;justify-content:space-between}
+.cal-grid>div b{font-size:12.5px;font-weight:600}
+.cal-grid>div span{display:flex;justify-content:flex-end;align-items:flex-end;min-height:18px}
+.cal-grid>div svg{width:15px;height:15px;color:var(--green)}
+.cal-done{background:var(--accent-soft)!important}
+.cal-today{border-color:var(--accent)!important}
+.cal-fut{font-style:normal;font-size:10.5px;font-weight:700;color:var(--blue);background:rgba(59,130,246,.12);border-radius:99px;padding:1px 6px}
 .bars{display:flex;align-items:flex-end;gap:8px;height:150px}
 .bars div{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;height:100%;justify-content:flex-end}
 .bars b{width:100%;max-width:36px;background:var(--accent);border-radius:6px 6px 2px 2px;min-height:2px}
@@ -168,6 +183,28 @@ label{display:block;font-size:13px;font-weight:600;color:var(--sub);margin-botto
 .modal h2{justify-content:space-between}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#111827;color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;opacity:0;pointer-events:none;transition:.25s;z-index:60;max-width:90vw}
 .toast.show{opacity:1;transform:translateX(-50%)}
+
+/* 7b. 확장 기능 스타일 (기존 토큰 재사용) */
+.tagchip{display:inline-flex;align-items:center;gap:4px;font-size:12px;padding:3px 9px;border-radius:99px;background:var(--bg);color:var(--sub);font-weight:600;white-space:nowrap;cursor:pointer;border:1px solid var(--line)}
+.tagchip:hover{border-color:#c7cbf5;color:var(--text)}
+.tagchip.on{background:var(--accent-soft);color:var(--accent);border-color:#c7cbf5}
+.tl{position:relative;padding-left:18px;display:flex;flex-direction:column;gap:12px}
+.tl:before{content:'';position:absolute;left:5px;top:4px;bottom:4px;width:2px;background:var(--line)}
+.tl .ev{position:relative}
+.tl .ev:before{content:'';position:absolute;left:-17px;top:5px;width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 2px var(--panel)}
+.tl .ev.mile:before{background:var(--green)}
+.tl .ev.warn:before{background:var(--amber)}
+.tl .d{font-weight:700;font-size:13.5px}
+.tl .s{color:var(--sub);font-size:13px}
+.pager{display:flex;align-items:center;justify-content:center;gap:12px;padding:12px 0 2px}
+.mini{height:36px;border:1px solid var(--line);border-radius:10px;background:var(--panel);display:flex;align-items:center;gap:8px;padding:0 12px;cursor:pointer;font-weight:600;font-size:13px;color:var(--sub);text-decoration:none}
+.mini:hover{color:var(--text);background:var(--bg)}
+.mini b{color:var(--accent);font-variant-numeric:tabular-nums}
+.mini svg{width:15px;height:15px}
+.deck.dragover{border-color:var(--accent);background:var(--accent-soft)}
+.dropzone{border:1.5px dashed var(--line);border-radius:12px;padding:14px;text-align:center;color:var(--sub);font-size:13px;transition:.15s}
+.dropzone.over{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.selbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 12px;background:var(--accent-soft);border:1px solid #c7cbf5;border-radius:12px;margin-bottom:10px;font-size:13.5px;font-weight:600;color:var(--accent)}
 
 /* 8. 모바일 */
 @media(max-width:820px){
@@ -227,6 +264,10 @@ const dayKey=(t=Date.now())=>{const d=new Date(t);return d.getFullYear()+'-'+Str
 const startOfDay=(t=Date.now())=>{const d=new Date(t);d.setHours(0,0,0,0);return d.getTime()};
 const shuffle=a=>{a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
 const isDesktop=()=>window.matchMedia?matchMedia('(min-width:821px)').matches:true;
+const fmtNum=n=>Number(n||0).toLocaleString('ko-KR');
+const fmtDur=s=>{s=Math.max(0,Math.round(s));const h=Math.floor(s/3600),m=Math.floor(s%3600/60);return (h?h+'시간 ':'')+(m||(!h?s+'초':''))+(h||m?'분':'')};
+// 시간대 문자열 파싱 ("19:30" → 분) — 실패 시 null
+const parseHM=s=>{const m=/^(\d{1,2})\s*[:.시]\s*(\d{1,2})?$/.exec(String(s||'').trim());if(!m)return null;const h=+m[1],mi=+(m[2]||0);return h>23||mi>59?null:h*60+mi};
 
 // 마지막에 뜬 토스트 (디버깅·테스트 훅)
 let LAST_TOAST='';
@@ -321,7 +362,14 @@ const I={
   clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   back:'<path d="m15 18-6-6 6-6"/>',
   globe:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
-  alert:'<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>'
+  alert:'<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>',
+  star:'<path d="M12 3l2.5 5.6 6.1.5-4.6 4 1.4 6-5.4-3.2L6.6 19l1.4-6L3.4 9l6.1-.5z"/>',
+  tag:'<path d="M4 4h7l9 9-7 7-9-9z"/><circle cx="8.5" cy="8.5" r="1.2"/>',
+  moon:'<path d="M20 14.5A8.5 8.5 0 1 1 9.5 4 7 7 0 0 0 20 14.5z"/>',
+  copy:'<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>',
+  target:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>',
+  award:'<circle cx="12" cy="9" r="5"/><path d="m8.5 13.5-2 7 5.5-3 5.5 3-2-7"/>',
+  zap:'<path d="M13 2 4 14h6l-1 8 9-12h-6z"/>'
 };
 
 /* ================= 3. 데이터 저장소 (localStorage 'memoryall') ================= */
@@ -329,12 +377,13 @@ const KEY='memoryall';
 let delTomb={};
 const DEF_SETTINGS={newPerDay:20,ttsLang:'auto',mode:'flash',pmNotify:false,pmWork:25,pmBreak:5,
   ai:{provider:'openai',base:'https://api.openai.com/v1',model:'gpt-4o-mini',key:''},
-  search:{provider:'wikipedia',key:'',url:'',lang:'ko'},mcp:[]};
+  search:{provider:'wikipedia',key:'',url:'',lang:'ko'},mcp:[],
+  theme:'auto',goal:30,dailyNotified:'',reversed:false};
 let S;
 
-function newCard(deck,front,back='',hint='',type='basic'){
+function newCard(deck,front,back='',hint='',type='basic',tags){
   const now=Date.now();
-  return {id:uid(),deck,type,front,back,hint,created:now,due:now,iv:0,ef:2.5,reps:0,lapses:0,last:0};
+  return {id:uid(),deck,type,front,back,hint,tags:Array.isArray(tags)?tags.map(String).slice(0,12):[],star:false,created:now,due:now,iv:0,ef:2.5,reps:0,lapses:0,last:0};
 }
 function seed(){
   const d1={id:uid(),name:'시작하기',created:Date.now()},d2={id:uid(),name:'영단어 기초',created:Date.now()};
@@ -370,6 +419,8 @@ function load(){
     if(typeof c.deck!=='string')c.deck='';
     if(!TYPES[c.type])c.type='basic';
     if(c.back==null)c.back='';if(c.hint==null)c.hint='';
+    if(!Array.isArray(c.tags))c.tags=[];c.tags=c.tags.map(String).slice(0,12);
+    c.star=!!c.star;
     if(typeof c.due!=='number'||isNaN(c.due))c.due=c.last||Date.now();
     if(typeof c.iv!=='number')c.iv=0;if(typeof c.ef!=='number'||c.ef<1.3)c.ef=2.5;
     if(typeof c.reps!=='number')c.reps=0;if(typeof c.lapses!=='number')c.lapses=0;
@@ -406,6 +457,17 @@ function deckCounts(id){
   return {total,due,nw};
 }
 function logReview(ok,isNew){const k=dayKey(),l=S.log[k]||(S.log[k]={n:0,ok:0,nw:0});l.n++;if(ok)l.ok++;if(isNew)l.nw++;(l.hs||(l.hs=[])).push(new Date().getHours())}
+// 세션 기록 (오늘의 학습 이력 타임라인·목표 진행용). 최대 300개 유지로 저장소 보호
+function logSession(){const k=dayKey();const ss=S.sessions&&Array.isArray(S.sessions[k])?S.sessions[k]:(S.sessions={...(S.sessions||{}),[k]:[]});ss.push({t:Date.now(),deck:S._sessDeck||null,n:S._sessN||0,ok:S._sessOk||0,dur:S._sessDur||0});if(ss.length>300)ss.splice(0,ss.length-300)}
+function todaySecs(){let s=0;for(const k in (S.sessions||{}))(S.sessions[k]||[]).forEach(x=>{if(typeof x.dur==='number')s+=x.dur;else if(+x.t>=startOfDay())s+=Math.min(1800,(Date.now()-+x.t)/1000)});return s}
+function goalDone(){return (S.log[dayKey()]?.n||0)>=Math.max(1,+S.settings.goal||30)}
+function checkGoal(){
+  const l=S.log[dayKey()];if(!l)return;
+  const g=Math.max(1,+S.settings.goal||30);
+  if(l.n>=g&&!l.goal){l.goal=Date.now();save();toast(`🎯 오늘 목표 ${g}장 달성!`,4000);navigator.vibrate?.([60,40,60]);beep()}
+}
+function streakBest(){let best=0,s=0,t=startOfDay()+DAY/2;if(!S.log[dayKey(t)])t-=DAY;while(dayKey(t)>='2000-01-01'){if(S.log[dayKey(t)]){s++;best=Math.max(best,s)}else s=0;t-=DAY}return best}
+function totalStudied(){let n=0;for(const k in S.log)n+=(+S.log[k].n||0);return n}
 function streak(){let s=0,t=startOfDay()+DAY/2;if(!S.log[dayKey(t)])t-=DAY;while(S.log[dayKey(t)]){s++;t-=DAY}return s}
 function weakCards(n=10){return S.cards.filter(c=>c.last&&(c.lapses>0||c.ef<2.3)).sort((a,b)=>b.lapses-a.lapses||a.ef-b.ef).slice(0,n)}
 
@@ -427,8 +489,38 @@ function fmtIv(c,g){
 }
 // 간격을 사람이 읽기 좋은 형태로 (목록·통계용)
 function fmtDue(iv){return iv<1?'-':iv<30?iv+'일':iv<365?Math.round(iv/30)+'개월':(iv/365).toFixed(1)+'년'}
-function buildQueue(id){
+/* ---------- 태그 · 즐겨찾기 (카드 분류) ---------- */
+const tagList=()=>{const m={};for(const c of S.cards)for(const t of (c.tags||[]))m[t]=(m[t]||0)+1;return Object.entries(m).sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0]))};
+const parseTags=s=>[...new Set(String(s||'').split(/[;,]/).map(x=>x.trim().replace(/^#/,'')).filter(Boolean))].slice(0,12);
+
+// 필터 상태 기반 카드 풀 (덱/태그/즐겨찾기/상태/검색)
+function filterCards(f){
+  const q=(f.q||'').toLowerCase();
+  return S.cards.filter(c=>{
+    if(f.deck&&c.deck!==f.deck)return false;
+    if(f.star&&!c.star)return false;
+    if(f.tag&&!(c.tags||[]).includes(f.tag))return false;
+    if(f.st==='new'&&c.last)return false;
+    if(f.st==='due'&&!(c.last&&c.due<Date.now()))return false;
+    if(f.st==='weak'&&!(c.lapses>0||c.ef<2.3))return false;
+    if(q&&!((c.front+' '+c.back+' '+c.hint+' '+(c.tags||[]).join(' ')).toLowerCase().includes(q)))return false;
+    return true;
+  });
+}
+function cardSort(list,sort){
+  const now=Date.now();
+  const cmps={created:(a,b)=>b.created-a.created,due:(a,b)=>(a.last?1:0)-(b.last?1:0)||a.due-b.due,alpha:(a,b)=>String(a.front).localeCompare(String(b.front)),lapses:(a,b)=>b.lapses-a.lapses,star:(a,b)=>(b.star?1:0)-(a.star?1:0)||b.created-a.created};
+  return [...list].sort(cmps[sort]||cmps.created);
+}
+
+function buildQueue(id,filters){
   const end=startOfDay()+DAY,pool=S.cards.filter(c=>!id||c.deck===id);
+  // 태그/즐겨찾기/검색 필터가 있으면 해당 범위만 학습 (새 카드 제한도 필터 내에서 적용)
+  if(filters&&(filters.tag||filters.star||filters.q)){
+    let sub=filterCards({...filters,deck:id||filters.deck});
+    const rev=sub.filter(c=>c.last&&c.due<end).sort((a,b)=>a.due-b.due),nw=sub.filter(c=>!c.last).sort((a,b)=>a.created-b.created);
+    return shuffle([...rev.map(c=>c.id),...nw.slice(0,newLimit()).map(c=>c.id)]);
+  }
   const rev=pool.filter(c=>c.last&&c.due<end).sort((a,b)=>a.due-b.due).map(c=>c.id);
   const nw=pool.filter(c=>!c.last).sort((a,b)=>a.created-b.created).slice(0,newLimit());
   nw.forEach((c,i)=>rev.splice(Math.min(rev.length,i*4+3),0,c.id)); // 새 카드를 복습 사이에 섞음
@@ -620,21 +712,24 @@ const fld=(label,inner,help='')=>`<div class="field"><label>${label}</label>${in
 const inp=(path,val,ph='',type='text')=>`<input type="${type}" data-set="${esc(path)}" value="${esc(val)}" placeholder="${esc(ph)}" autocomplete="off">`;
 const statBox=(l,n,i)=>`<div class="card stat"><div class="l">${ic(I[i])}${l}</div><div class="n">${n}</div></div>`;
 const closeBtn=()=>`<button class="icon-btn" data-act="close">${ic(I.x)}</button>`;
-let deferredPrompt=null,ST=null,DQ='',MN='';
-const GEN0=()=>({items:[],busy:false,src:'',count:15,type:'mixed',deck:'',web:false});
+let deferredPrompt=null,DQ='',MN='';
+const DS0=()=>({tag:'',star:false,st:'',sort:'created',page:1,sel:new Set(),q:''}); // 덱 화면 필터/정렬/선택 상태 (메모리 전용)
+let DS=DS0();
+const GEN0=()=>({items:[],busy:false,src:'',count:15,type:'mixed',deck:'',web:false,tags:''});
 const TUTOR0=()=>({msgs:[],hist:[],busy:false,web:false,mcp:false});
 let GEN=GEN0(),TUTOR=TUTOR0();
 
-const NAV=[['home','홈','home','#home'],['study','학습','study','#study/all'],['gen','AI 생성','spark','#gen'],['tutor','튜터','chat','#tutor'],['stats','통계','chart','#stats'],['settings','설정','gear','#settings']];
+const NAV=[['home','홈','home','#home'],['study','학습','study','#study/all'],['gen','AI 생성','spark','#gen'],['tutor','튜터','chat','#tutor'],['stats','통계','chart','#stats'],['calendar','캘린더','clock','#calendar'],['settings','설정','gear','#settings']];
 function renderNav(r){
   $('#sideNav').innerHTML=NAV.map(([k,l,i,h])=>`<a class="nav ${r===k?'on':''}" href="${h}">${ic(I[i])}${l}</a>`).join('');
   $('#tabbar').innerHTML=NAV.slice(0,5).map(([k,l,i,h])=>`<a class="${r===k?'on':''}" href="${h}">${ic(I[i])}<span>${l}</span></a>`).join('');
+  const tb=$('#tabbar');if(tb)tb.style.gridTemplateColumns='repeat(5,1fr)';
 }
 const curRoute=()=>(location.hash.slice(1)||'home').split('/');
 function route(){
   stopSpeak();closeModal();
   const [r,arg]=curRoute();
-  const views={home:vHome,deck:vDeck,study:startStudy,gen:vGen,tutor:vTutor,stats:vStats,settings:vSettings};
+  const views={home:vHome,deck:vDeck,study:startStudy,gen:vGen,tutor:vTutor,stats:vStats,calendar:vCalendar,settings:vSettings};
   if(r!=='study')ST=null;
   if(r!=='deck')DQ='';
   renderNav(r==='deck'?'home':views[r]?r:'home');
@@ -646,50 +741,126 @@ const go=h=>{if(location.hash===h)route();else location.hash=h};
 function rerender(){
   if(ST)return drawStudy();
   const [r,a]=curRoute();
-  ({deck:vDeck,stats:vStats,home:vHome}[r]||(()=>{}))(a);
+  ({deck:vDeck,stats:vStats,home:vHome,calendar:vCalendar}[r]||(()=>{}))(a);
 }
 function refreshInstall(){const [r]=curRoute();if(r==='home')vHome();else if(r==='settings')vSettings()}
 
+function themeOn(){const t=S.settings.theme||'auto';return t==='dark'||(t==='auto'&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)}
+function applyTheme(){document.body.classList.toggle('dark',themeOn());const m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content',themeOn()?'#0f1218':'#ffffff')}
+try{window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change',applyTheme)}catch{}
+
+/* ---------- 캘린더 ---------- */
+function vCalendar(){
+  const now=new Date();now.setHours(12,0,0,0);
+  const y=now.getFullYear(),mo=now.getMonth();
+  const W=['일','월','화','수','목','금','토'];
+  const first=new Date(y,mo,1),offset=first.getDay(),days=new Date(y,mo+1,0).getDate();
+  const todayK=dayKey(),sod=startOfDay();
+  let cells='';
+  for(let i=0;i<offset;i++)cells+='<div></div>';
+  for(let d=1;d<=days;d++){
+    const t=new Date(y,mo,d,12).getTime(),k=dayKey(t);
+    const learned=S.log[k]?.n||0,future=S.cards.filter(c=>c.last&&c.due>=t&&c.due<t+DAY).length;
+    cells+=`<div class="${k===todayK?'cal-today':''} ${learned?'cal-done':''}" title="${k}: 학습 ${learned}장 · 예정 ${future}장"><b>${d}</b><span>${learned?ic(I.check):future?`<i class="cal-fut">${future}</i>`:''}</span></div>`;
+  }
+  const dueToday=S.cards.filter(c=>c.last&&c.due<sod+DAY).length,nwToday=Math.min(deckCounts(null).nw,newLimit());
+  const monthLearned=[...Array(days)].reduce((a,_,i)=>a+(S.log[dayKey(new Date(y,mo,i+1,12).getTime())]?.n||0),0);
+  M(`<div class="head"><div><h1>캘린더</h1><div class="sub">${y}년 ${mo+1}월 · 이번 달 ${fmtNum(monthLearned)}장 학습</div></div>
+  <a class="btn pri" href="#study/all">${ic(I.play)}오늘 학습 (${dueToday+nwToday}장)</a></div>
+  <div class="card"><div class="cal-grid">${W.map(w=>`<u>${w}</u>`).join('')}${cells}</div>
+  <div class="pills" style="margin-top:12px"><span class="pill g">✔ 학습한 날</span><span class="pill b">숫자 = 그날 복습 예정</span><span class="pill a">테두리 = 오늘</span></div></div>
+  <div class="card" style="margin-top:14px"><h2>${ic(I.clock)}이번 주 요약</h2>
+  <div class="grid" style="margin-top:6px">${statBox('오늘 학습',(S.log[todayK]?.n||0)+'장','check')}${statBox('복습 대기',dueToday,'clock')}${statBox('새 카드 여분',nwToday,'plus')}${statBox('연속 학습',streak()+'일','flame')}</div></div>`);
+}
+
 /* ---------- 홈 ---------- */
 function vHome(){
-  const all=deckCounts(null),nw=Math.min(all.nw,newLimit());
+  const all=deckCounts(null),nw=Math.min(all.nw,newLimit()),todayL=S.log[dayKey()]||{n:0},g=Math.max(1,+S.settings.goal||30);
   M(`<div class="head"><div><h1>오늘의 학습</h1><div class="sub">${new Date().toLocaleDateString('ko-KR',{month:'long',day:'numeric',weekday:'long'})}</div></div>
-  <div class="row">${deferredPrompt?`<button class="btn" data-act="install">${ic(I.download)}앱 설치</button>`:''}<button class="btn" data-act="import">${ic(I.upload)}<span class="hide-m">가져오기</span></button><button class="btn pri" data-act="newDeck">${ic(I.plus)}새 덱</button></div></div>
-  <div class="grid" style="margin-bottom:14px">${statBox('복습 대기',all.due,'clock')}${statBox('새 카드',nw,'plus')}${statBox('연속 학습',streak()+'일','flame')}${statBox('오늘 학습',(S.log[dayKey()]?.n||0)+'장','check')}</div>
-  ${all.due+nw?`<a class="btn pri" href="#study/all" style="width:100%;padding:13px;margin-bottom:26px">${ic(I.play)}전체 학습 시작</a>`:`<div class="card empty" style="margin-bottom:26px;padding:22px">오늘 할 복습을 모두 끝냈어요</div>`}
-  <h2>${ic(I.study)}내 덱</h2>
-  ${S.decks.length?`<div class="grid">${S.decks.map(d=>{const c=deckCounts(d.id);return `<div class="card deck" data-act="openDeck" data-id="${esc(d.id)}"><div class="name">${esc(d.name)}</div><div class="pills"><span class="pill b">복습 ${c.due}</span><span class="pill g">새 ${c.nw}</span><span class="pill">전체 ${c.total}</span></div></div>`}).join('')}</div>`
+  <div class="row"><button class="icon-btn" data-act="theme" title="테마 전환 (자동/라이트/다크)" style="width:38px;height:38px">${ic(themeOn()?I.star:I.moon)}</button>${deferredPrompt?`<button class="btn" data-act="install">${ic(I.download)}앱 설치</button>`:''}<button class="btn" data-act="import">${ic(I.upload)}<span class="hide-m">가져오기</span></button><button class="btn pri" data-act="newDeck">${ic(I.plus)}새 덱</button></div></div>
+  <div class="grid" style="margin-bottom:14px">${statBox('복습 대기',all.due,'clock')}${statBox('새 카드',nw,'plus')}${statBox('연속 학습',streak()+'일','flame')}${statBox('오늘 학습',(todayL.n||0)+'장','check')}</div>
+  <div class="card" style="margin-bottom:22px;padding:14px 18px">
+    <div class="row" style="justify-content:space-between;margin-bottom:8px"><b style="font-size:13.5px;display:flex;align-items:center;gap:6px">${ic(I.target)}오늘의 목표 ${fmtNum(g)}장</b>
+      <span class="sub">${todayL.n>=g?'달성했습니다! 🎉':`${Math.max(0,g-todayL.n)}장 남았어요`} · 학습 ${fmtDur(todaySecs())} · ${streak()}일 연속 (최고 ${streakBest()}일)</span></div>
+    <div class="progress"><i style="width:${Math.min(100,todayL.n/g*100)}%;background:${todayL.n>=g?'var(--green)':'var(--accent)'}"></i></div></div>
+  ${all.due+nw?`<a class="btn pri" href="#study/all" style="width:100%;padding:13px;margin-bottom:26px">${ic(I.play)}전체 학습 시작 (${all.due+nw}장)</a>`:`<div class="card empty" style="margin-bottom:26px;padding:22px">오늘 할 복습을 모두 끝냈어요<div class="row" style="justify-content:center;margin-top:12px"><a class="btn sm" href="#stats">${ic(I.chart)}통계 보기</a><a class="btn sm" href="#gen">${ic(I.spark)}새 카드 만들기</a></div></div>`}
+  <h2>${ic(I.study)}내 덱 <span class="sub" style="font-weight:400;font-size:12.5px">카드를 다른 덱으로 드래그할 수 있어요</span></h2>
+  ${S.decks.length?`<div class="grid">${S.decks.map(d=>{const c=deckCounts(d.id);return `<div class="card deck" data-drop="1" data-id="${esc(d.id)}" data-act="openDeck" draggable="false"><div class="name">${esc(d.name)}</div><div class="pills"><span class="pill b">복습 ${c.due}</span><span class="pill g">새 ${c.nw}</span><span class="pill">전체 ${c.total}</span></div></div>`}).join('')}</div>`
   :`<div class="card empty"><div class="bigic" style="background:var(--accent-soft);color:var(--accent)">${ic(I.study)}</div>아직 덱이 없어요<div class="row" style="justify-content:center;margin-top:14px"><button class="btn pri" data-act="newDeck">${ic(I.plus)}새 덱</button><a class="btn" href="#gen">${ic(I.spark)}AI로 만들기</a></div></div>`}`);
 }
 
 /* ---------- 덱 상세 ---------- */
 function vDeck(id){
   const d=S.decks.find(x=>x.id===id);if(!d){location.hash='#home';return}
+  DS=DS0();DQ='';
   const c=deckCounts(id),st=S.cards.filter(x=>x.deck===id&&x.last);
   const avg=st.length?Math.round(st.reduce((a,x)=>a+x.ef,0)/st.length*100)/100:0;
+  const tags=[...new Set(S.cards.filter(x=>x.deck===id).flatMap(x=>x.tags||[]))];
   M(`<div class="head"><div class="row" style="flex-wrap:nowrap;min-width:0"><a class="icon-btn" href="#home">${ic(I.back)}</a><div style="min-width:0"><h1>${esc(d.name)}</h1><div class="pills" style="margin-top:4px"><span class="pill b">복습 ${c.due}</span><span class="pill g">새 ${c.nw}</span><span class="pill">전체 ${c.total}</span>${avg?`<span class="pill a">평균 용이도 ${avg}</span>`:''}</div></div></div>
   <div class="row" style="gap:6px"><a class="btn pri" href="#study/${encodeURIComponent(d.id)}">${ic(I.play)}학습</a><button class="btn" data-act="addCard" data-id="${esc(d.id)}">${ic(I.plus)}추가</button>
   <button class="icon-btn" data-act="import" data-id="${esc(d.id)}" title="가져오기">${ic(I.upload)}</button><button class="icon-btn" data-act="exportDeck" data-id="${esc(d.id)}" title="CSV 내보내기">${ic(I.download)}</button><button class="icon-btn" data-act="renameDeck" data-id="${esc(d.id)}" title="이름 변경">${ic(I.edit)}</button><button class="icon-btn" data-act="delDeck" data-id="${esc(d.id)}" title="덱 삭제">${ic(I.trash)}</button></div></div>
-  <div class="card"><input id="deckQ" data-deck="${esc(d.id)}" placeholder="카드 검색" value="${esc(DQ)}" style="margin-bottom:6px"><div class="list" id="cardList"></div></div>`);
+  ${tags.length?`<div class="pills" style="margin-bottom:12px"><span class="tagchip ${!DS.tag&&!DS.star?'on':''}" data-act="dfilter" data-v="">전체</span>${tags.slice(0,20).map(t=>`<span class="tagchip ${DS.tag===t?'on':''}" data-act="dfilter" data-v="${esc(t)}">#${esc(t)}</span>`).join('')}<span class="tagchip ${DS.star?'on':''}" data-act="dstar">${ic(I.star)}즐겨찾기</span></div>`:`<span class="tagchip ${DS.star?'on':''}" data-act="dstar" style="margin-bottom:12px">${ic(I.star)}즐겨찾기</span>`}
+  <div class="card"><div class="row" style="gap:8px;margin-bottom:6px;flex-wrap:nowrap"><input id="deckQ" placeholder="카드 검색" value="${esc(DQ)}" style="flex:1">
+  <select id="deckSort" style="width:auto;flex-shrink:0">${[['created','최신순'],['due','만료순'],['alpha','가나다'],['lapses','자주 틀림'],['star','즐겨찾기']].map(([k,l])=>`<option value="${k}" ${DS.sort===k?'selected':''}>${l}</option>`).join('')}</select></div>
+  <div class="dropzone" id="deckDrop" style="display:none;margin-bottom:8px">여기에 CSV/TXT 파일을 놓으면 이 덱에 가져옵니다</div>
+  <div class="list" id="cardList"></div><div id="cardPager"></div></div>`);
   drawCardList(id);
+  $('#deckQ').addEventListener('input',e=>{DQ=e.target.value;DS.page=1;drawCardList(id)});
+  $('#deckSort').addEventListener('change',e=>{DS.sort=e.target.value;DS.page=1;drawCardList(id)});
 }
+const PAGE_N=50;
 function drawCardList(id){
-  const q=DQ.toLowerCase(),now=Date.now(),box=$('#cardList');if(!box)return;
-  const list=S.cards.filter(c=>c.deck===id&&(!q||(c.front+' '+c.back+' '+c.hint).toLowerCase().includes(q)));
-  box.innerHTML=list.length?list.map(c=>`<div class="item"><div class="tx"><div class="f">${esc(prev(c.front))}</div><div class="b">${esc(c.back||c.hint||'')}</div></div>
+  const box=$('#cardList');if(!box)return;
+  const now=Date.now(),q=DQ.toLowerCase();
+  let list=S.cards.filter(c=>c.deck===id&&(!q||(c.front+' '+c.back+' '+c.hint+' '+(c.tags||[]).join(' ')).toLowerCase().includes(q)));
+  if(DS.tag)list=list.filter(c=>(c.tags||[]).includes(DS.tag));
+  if(DS.star)list=list.filter(c=>c.star);
+  list=cardSort(list,DS.sort);
+  const pages=Math.max(1,Math.ceil(list.length/PAGE_N));DS.page=Math.min(Math.max(1,DS.page),pages);
+  const page=list.slice((DS.page-1)*PAGE_N,DS.page*PAGE_N);
+  box.innerHTML=page.length?page.map(c=>`<div class="item" draggable="true" data-dragcard="${esc(c.id)}">
+  <input type="checkbox" class="chk" data-csel="${esc(c.id)}" ${DS.sel.has(c.id)?'checked':''} style="margin:0">
+  <div class="tx"><div class="f">${c.star?`<span style="color:var(--amber)">★</span> `:''}${esc(prev(c.front))}</div>
+  <div class="b">${esc(c.back||c.hint||'')}${(c.tags||[]).length?` <span style="color:var(--accent)">#${c.tags.map(esc).join(' #')}</span>`:''}</div></div>
+  <button class="icon-btn" data-act="toggleStar" data-id="${esc(c.id)}" title="즐겨찾기">${ic(I.star)}</button>
   ${c.last?`<span class="pill hide-m" title="복습 간격 · 반복 ${c.reps}회 · 틀림 ${c.lapses}회 · 용이도 ${Math.round(c.ef*100)/100}">간격 ${fmtDue(c.iv)}</span>`:''}
   <span class="pill ${!c.last?'g':c.due<=now?'b':''} hide-m">${!c.last?'새 카드':c.due<=now?'복습 대기':Math.ceil((c.due-now)/DAY)+'일 후'}</span>
   <button class="icon-btn" data-act="editCard" data-id="${esc(c.id)}">${ic(I.edit)}</button><button class="icon-btn" data-act="delCard" data-id="${esc(c.id)}">${ic(I.trash)}</button></div>`).join('')
-  :`<div class="empty">${q?'검색 결과가 없어요':'카드가 없어요. 추가하거나 가져와 보세요'}</div>`;
+  :`<div class="empty">${q||DS.tag||DS.star?'검색·필터 결과가 없어요':'카드가 없어요. 추가하거나 가져와 보세요'}</div>`;
+  const pg=$('#cardPager');
+  if(pg)pg.innerHTML=pages>1?`<div class="pager"><button class="mini" data-act="cPage" data-p="${DS.page-1}" ${DS.page<=1?'disabled':''}>${ic(I.back)}이전</button><span class="sub">${DS.page} / ${pages} 페이지 · ${fmtNum(list.length)}장</span><button class="mini" data-act="cPage" data-p="${DS.page+1}" ${DS.page>=pages?'disabled':''}>다음${ic('<path d="m9 6 6 6-6 6"/>')}</button></div>`:'';
+  updateSelBar(id);
+}
+function updateSelBar(id){
+  const host=$('#cardList');if(!host)return;
+  let bar=$('#selBar');
+  if(!DS.sel.size){if(bar)bar.remove();return}
+  if(!bar){bar=document.createElement('div');bar.id='selBar';bar.className='selbar';host.parentElement.insertBefore(bar,host)}
+  bar.innerHTML=`<span>선택 ${DS.sel.size}장</span><button class="btn sm" data-act="bulkTag" data-id="${esc(id)}">${ic(I.tag)}태그</button>
+  <button class="btn sm" data-act="bulkMove" data-id="${esc(id)}">${ic(I.copy)}다른 덱으로</button>
+  <button class="btn sm" data-act="bulkStar">${ic(I.star)}즐겨찾기</button>
+  <button class="btn sm danger" data-act="bulkDel" data-id="${esc(id)}">${ic(I.trash)}삭제</button>
+  <button class="btn sm ghost" data-act="selClear">해제</button>`;
 }
 
 /* ---------- 학습 ---------- */
 const curCard=()=>ST&&S.cards.find(c=>c.id===ST.q[ST.i]);
 const resetCardState=()=>Object.assign(ST,{show:false,hint:false,picked:null,choices:null,typed:null,correct:null});
+// 학습 상태 (ST) — 새로고침 후에도 이어서 학습할 수 있도록 localStorage 스냅샷 사용
+const STK='memoryall-st';
+let ST=null;
+function stSave(){try{if(ST&&ST.q.length&&ST.i<ST.q.length)localStorage.setItem(STK,JSON.stringify({deck:ST.deck,q:ST.q.slice(ST.i),done:ST.done,ok:ST.ok||0,mode:ST.mode,f:ST.f||null,t0:ST.t0}));else if(ST)localStorage.removeItem(STK)}catch{}}
+function stLoad(){try{const d=safeJSON(localStorage.getItem(STK)||'null');if(d&&Array.isArray(d.q)&&d.q.length){const ids=new Set(S.cards.map(c=>c.id));d.q=d.q.filter(id=>ids.has(id));if(!d.q.length){localStorage.removeItem(STK);return null}return d}}catch{}return null}
 function startStudy(arg){
   const id=arg&&arg!=='all'?arg:null;
   if(id&&!S.decks.some(d=>d.id===id)){location.hash='#home';return}
-  ST={deck:id,q:buildQueue(id),i:0,done:0,mode:S.settings.mode||'flash'};resetCardState();drawStudy();
+  // 저장된 대열이 있고 같은 대상(같은 덱 또는 모두 'all')이면 이어서 학습
+  const sv=stLoad();
+  if(sv&&((sv.deck||null)===(id||null))){
+    ST={deck:id&&S.decks.some(d=>d.id===sv.deck)?sv.deck:(sv.deck||null),q:sv.q,i:0,done:+sv.done||0,ok:+sv.ok||0,mode:sv.mode||S.settings.mode||'flash',f:sv.f||null,t0:+sv.t0||Date.now()};
+    resetCardState();drawStudy();return
+  }
+  ST={deck:id,q:buildQueue(id),i:0,done:0,ok:0,mode:S.settings.mode||'flash',t0:Date.now()};resetCardState();stSave();drawStudy();
 }
 function makeChoices(c){
   const a=ansText(c);if(!a)return null;
@@ -702,10 +873,11 @@ function drawStudy(){
   const deck=ST.deck&&S.decks.find(d=>d.id===ST.deck),title=deck?esc(deck.name):'전체 학습',back=deck?'#deck/'+encodeURIComponent(deck.id):'#home';
   const c=curCard();
   if(!c){
-    const doneN=ST.done; // 완료 장면을 먼저 계산한 뒤 학습 상태 정리 (좀비 ST로 인한 단축키·rerender 오류 방지)
-    ST=null;
+    const doneN=ST.done,okN=ST.ok||0,dur=Math.round((Date.now()-(ST.t0||Date.now()))/1000); // 완료 장면을 먼저 계산한 뒤 학습 상태 정리
+    if(doneN)logSession({t:Date.now(),deck:ST.deck,n:doneN,ok:okN,dur});
+    localStorage.removeItem(STK);ST=null;checkGoal();rerender();
     M(`<div class="head"><div class="row"><a class="icon-btn" href="${back}">${ic(I.back)}</a><h1>${title}</h1></div></div><div class="card empty">
-    ${doneN?`<div class="bigic" style="background:#ecfdf5;color:var(--green)">${ic(I.check)}</div><h2 style="justify-content:center">학습 완료</h2><p>${doneN}장을 복습했어요. 연속 ${streak()}일째!</p>`
+    ${doneN?`<div class="bigic" style="background:#ecfdf5;color:var(--green)">${ic(I.check)}</div><h2 style="justify-content:center">학습 완료</h2><p>${doneN}장을 복습했어요 · 정답 ${Math.round(okN/doneN*100)}% · ${fmtDur(dur)} · 연속 ${streak()}일째!</p>`
     :`<div class="bigic" style="background:var(--accent-soft);color:var(--accent)">${ic(I.clock)}</div><h2 style="justify-content:center">지금 학습할 카드가 없어요</h2><p>새 카드를 추가하거나 AI로 만들어 보세요.</p>`}
     <div class="row" style="justify-content:center;margin-top:18px"><a class="btn" href="#home">홈으로</a><a class="btn pri" href="#gen">${ic(I.spark)}AI로 카드 만들기</a></div></div>`);
     return;
@@ -723,21 +895,24 @@ function drawStudy(){
   act+=ST.show?`<div class="gradebar">${[[1,'다시'],[2,'어려움'],[3,'좋음'],[4,'쉬움']].map(([g,l])=>`<button class="btn gr${g}" data-act="grade" data-g="${g}">${l}<small>${fmtIv(c,g)}</small></button>`).join('')}</div>`
     :mode==='type'?`<button class="btn ghost" data-act="reveal" style="width:100%">모르겠어요 · 정답 보기</button>`:`<button class="btn ${mode==='flash'?'pri':''}" data-act="reveal" style="width:100%;padding:13px">${mode==='quiz'?'모르겠어요 · 정답 보기':'정답 보기'}</button>`;
   M(`<div class="head"><div class="row" style="flex-wrap:nowrap"><a class="icon-btn" href="${back}">${ic(I.back)}</a><div><h1>${title}</h1><div class="sub">${ST.done}장 완료 · 남은 ${left}장</div></div></div>
-  <div class="row" style="gap:6px">${[['flash','플래시'],['quiz','객관식'],['type','입력']].map(([k,l])=>`<button class="toggle ${ST.mode===k?'on':''}" data-act="mode" data-v="${k}">${l}</button>`).join('')}</div></div>
+  <div class="row" style="gap:6px">${[['flash','플래시'],['quiz','객관식'],['type','입력']].map(([k,l])=>`<button class="toggle ${ST.mode===k?'on':''}" data-act="mode" data-v="${k}">${l}</button>`).join('')}
+  <button class="toggle ${S.settings.reversed?'on':''}" data-act="revMode" title="앞면과 뒷면 교체 (단축키 F)">${ic(I.copy)}뒤집기</button></div></div>
   <div class="progress" style="margin-bottom:16px"><i style="width:${pct}%"></i></div>
   <div class="card flash" id="flash" ${mode==='flash'&&!ST.show?'data-act="reveal"':''}>
-    <div>${qH}</div>
+    <div>${S.settings.reversed?aH:qH}</div>
     ${ST.hint&&c.hint?`<div class="hint">${ic(I.bulb)}<span>${nl(c.hint)}</span></div>`:''}
-    ${ST.show?`<div class="ans">${aH}</div>`:''}
+    ${ST.show?`<div class="ans">${S.settings.reversed?qH:aH}</div>`:''}
   </div>
   <div class="tools" style="margin:12px 0">
     <button class="btn sm ghost" data-act="hint" ${c.hint?'':'disabled'}>${ic(I.bulb)}힌트</button>
     <button class="btn sm ghost" data-act="speak">${ic(I.volume)}듣기</button>
     <button class="btn sm ghost" data-act="mnemonic">${ic(I.spark)}AI 암기법</button>
+    <button class="btn sm ghost" data-act="toggleStar" data-id="${esc(c.id)}" style="color:${c.star?'var(--amber)':''}">${ic(I.star)}즐겨찾기</button>
+    <button class="btn sm ghost" data-act="skipCard" title="평가하지 않고 건너뛰기">건너뛰기</button>
     <button class="btn sm ghost" data-act="editCur">${ic(I.edit)}수정</button>
   </div>
   ${act}
-  <div class="kbd hide-m" style="text-align:center;margin-top:14px">Space 정답 보기 · 1~4 평가 · H 힌트 · S 듣기 · 모바일: 좌우 스와이프로 평가</div>`);
+  <div class="kbd hide-m" style="text-align:center;margin-top:14px">Space 정답 보기 · 1~4 평가 · H 힌트 · S 듣기 · F 뒤집기 · 모바일: 좌우 스와이프로 평가</div>`);
   if(isDesktop())$('#typeIn')?.focus();
 }
 function grade(g){
@@ -747,20 +922,20 @@ function grade(g){
   {let guard=0;while(ST&&ST.i<ST.q.length&&!S.cards.some(c=>c.id===ST.q[ST.i])){ST.q.splice(ST.i,1);if(++guard>ST.q.length+5)break}}
   if(!ST)return;
   const id=ST.q[ST.i],idx=S.cards.findIndex(c=>c.id===id);
-  if(idx<0){ST.i++;resetCardState();drawStudy();return}
+  if(idx<0){ST.i++;resetCardState();stSave();drawStudy();return}
   let ok=g>1;
   if(ST.mode==='quiz'&&ST.choices)ok=ST.picked!=null&&ST.choices[ST.picked]===ansText(curCard()||S.cards[idx]);
   else if(ST.mode==='type'&&ST.typed!=null)ok=!!ST.correct;
   if(idx>-1){
     const isNew=!S.cards[idx].last;
-    S.cards[idx]={...nextState(S.cards[idx],g),updated:Date.now()};logReview(ok,isNew);save();
+    S.cards[idx]={...nextState(S.cards[idx],g),updated:Date.now()};logReview(ok,isNew);if(ok)ST.ok=(ST.ok||0)+1;save();
     navigator.vibrate?.(g===1?[30,40,30]:15);
     if(g===1)ST.q.splice(Math.min(ST.q.length,ST.i+4),0,id); // 틀린 카드는 몇 장 뒤에 다시
   }else{
     // 카드가 이미 삭제된 상태(좀비 카드) — 채점·기록 없이 대열에서만 제거
     ST.q.splice(ST.i,1);
   }
-  ST.done++;ST.i++;resetCardState();drawStudy();
+  ST.done++;ST.i++;resetCardState();stSave();drawStudy();
 }
 function pick(i){
   if(!ST||ST.show||!ST.choices)return;
@@ -806,25 +981,32 @@ function cardModal(id,deckId){
   const c=id?S.cards.find(x=>x.id===id):null;
   if(!S.decks.length){S.decks.push({id:uid(),name:'기본 덱',created:Date.now()});save()}
   const dk=c?c.deck:deckId||S.decks[0].id,t=c?.type||'basic';
+  const rt=tagList();const tagHelp=rt.length?('최근 태그: '+rt.slice(0,12).map(x=>'<button type="button" class="tagchip" data-tagadd="'+esc(x[0])+'" style="margin:2px">#'+esc(x[0])+'</button>').join('')):'';
   openModal(`<h2>${c?'카드 수정':'카드 추가'}${closeBtn()}</h2>
   <div class="two">${fld('덱',`<select id="cDeck">${S.decks.map(d=>`<option value="${esc(d.id)}" ${dk===d.id?'selected':''}>${esc(d.name)}</option>`).join('')}</select>`)}${fld('유형',`<select id="cType">${Object.entries(TYPES).map(([k,v])=>`<option value="${k}" ${t===k?'selected':''}>${v}</option>`).join('')}</select>`)}</div>
   ${fld('앞면',`<textarea id="cFront" placeholder="질문, 단어 또는 문장">${esc(c?.front||'')}</textarea>`,'빈칸 카드는 정답을 {{정답}}처럼 감싸세요 · Enter 저장 (Shift+Enter 줄바꿈)')}
   ${fld('뒷면',`<textarea id="cBack" placeholder="답 또는 뜻 (빈칸 카드는 보충 설명)">${esc(c?.back||'')}</textarea>`)}
   ${fld('힌트 · 예문',`<input id="cHint" value="${esc(c?.hint||'')}" placeholder="선택" autocomplete="off">`)}
+  ${fld('태그 (쉼표로 구분)',`<input id="cTags" value="${esc((c&&c.tags||[]).join(', '))}" placeholder="예: 시험, 중요, 동사" autocomplete="off">`,tagHelp)}
   <div class="row" style="justify-content:flex-end"><button class="btn" data-act="close">닫기</button><button class="btn pri" data-act="saveCard" data-id="${esc(c?.id||'')}">${ic(I.check)}저장</button></div>`);
   // Enter로 줄바꿈 대신 바로 저장 (Ctrl+Enter도 지원) — 백틱 이스케이프 버그로 이벤트가 안 걸리던 문제 수정
   $('#cFront').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();saveCard(c?.id||'')}});
   $('#cBack').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();saveCard(c?.id||'')}});
+  // 최근 태그 칩 클릭 → 태그 입력창에 추가 (버튼이라 change 이벤트가 안 뜨므로 click으로 처리)
+  $('#modal').querySelectorAll('[data-tagadd]').forEach(b=>b.addEventListener('click',ev=>{
+    ev.preventDefault();const el2=$('#cTags');if(!el2)return;
+    const cur=el2.value.trim();el2.value=(cur?cur.replace(/[,;]\s*$/,'')+', ':'')+b.dataset.tagadd;el2.focus();
+  }));
   setTimeout(()=>$('#cFront')?.focus(),50);
 }
 function saveCard(id){
   if(!$('#cFront'))return; // 이미 저장·닫힌 뒤 중복 호출 방지
-  const f=$('#cFront').value.trim(),b=$('#cBack').value.trim(),h=$('#cHint').value.trim(),t=$('#cType').value,dk=$('#cDeck').value;
+  const f=$('#cFront').value.trim(),b=$('#cBack').value.trim(),h=$('#cHint').value.trim(),t=$('#cType').value,dk=$('#cDeck').value,tg=parseTags($('#cTags')?.value);
   if(!f)return toast('앞면을 입력하세요');
   if(t==='cloze'&&!/\{\{.+?\}\}/.test(f))return toast('빈칸 카드는 {{정답}} 표시가 필요합니다');
   if(t!=='cloze'&&!b)return toast('뒷면을 입력하세요');
-  if(id){const c=S.cards.find(x=>x.id===id);if(c)Object.assign(c,{front:f,back:b,hint:h,type:t,deck:dk,updated:Date.now()});save();closeModal();toast('수정됨')}
-  else{S.cards.push(newCard(dk,f,b,h,t));save();['cFront','cBack','cHint'].forEach(k=>$('#'+k).value='');$('#cFront').focus();toast('추가됨 · 계속 입력하세요')}
+  if(id){const c=S.cards.find(x=>x.id===id);if(c)Object.assign(c,{front:f,back:b,hint:h,type:t,deck:dk,tags:tg,updated:Date.now()});save();closeModal();toast('수정됨')}
+  else{S.cards.push(newCard(dk,f,b,h,t,tg));save();['cFront','cBack','cHint'].forEach(k=>{const e=$('#'+k);if(e)e.value=''});$('#cFront')?.focus();toast('추가됨 · 계속 입력하세요')}
   rerender();
 }
 function importModal(deckId){
@@ -868,6 +1050,7 @@ function vGen(){
   ${fld('주제 또는 자료',`<textarea id="gSrc" style="min-height:140px" placeholder="예: 조선 왕 순서 / 토익 필수 동사 30개 / 교과서 내용 붙여넣기">${esc(GEN.src)}</textarea>`)}
   <div class="two">${fld('저장할 덱',`<select id="gDeck">${S.decks.map(d=>`<option value="${esc(d.id)}" ${GEN.deck===d.id?'selected':''}>${esc(d.name)}</option>`).join('')}<option value="__new" ${GEN.deck==='__new'||!S.decks.length?'selected':''}>+ 새 덱 만들기</option></select>`)}
   ${fld('카드 유형',`<select id="gType">${Object.entries(T).map(([k,v])=>`<option value="${k}" ${GEN.type===k?'selected':''}>${v}</option>`).join('')}</select>`)}</div>
+  ${fld('태그 (선택 · 저장되는 모든 카드에 붙임)',`<input id="gTags" value="${esc(GEN.tags||'')}" placeholder="예: 시험, 중요" autocomplete="off">`)}
   <div class="two">${fld('카드 수 (1~100)',`<input id="gCount" type="number" min="1" max="100" value="${GEN.count}">`)}
   <div class="field"><label>옵션</label><label class="toggle ${GEN.web?'on':''}" style="height:42px;border-radius:10px"><input type="checkbox" id="gWeb" class="chk" ${GEN.web?'checked':''}>${ic(I.globe)}웹 검색으로 사실 보강</label></div></div>
   <button class="btn pri" data-act="gen" style="width:100%;padding:12px" ${GEN.busy?'disabled':''}>${GEN.busy?'<span class="spin"></span>생성 중...':ic(I.spark)+'카드 생성하기'}</button>
@@ -880,7 +1063,7 @@ function vGen(){
 function syncGen(){
   const g=id=>document.getElementById(id);if(!g('gSrc'))return;
   GEN.src=g('gSrc').value;GEN.count=Math.min(100,Math.max(1,parseInt(g('gCount').value)||15));
-  GEN.type=g('gType').value;GEN.deck=g('gDeck').value;GEN.web=g('gWeb').checked;
+  GEN.type=g('gType').value;GEN.deck=g('gDeck').value;GEN.web=g('gWeb').checked;GEN.tags=g('gTags')?.value||'';
 }
 async function doGen(){
   if(GEN.busy)return;
@@ -910,7 +1093,8 @@ function genSave(){
   const items=GEN.items.filter(x=>x.on);if(!items.length)return toast('저장할 카드를 선택하세요');
   let dk=GEN.deck;
   if(dk==='__new'||!S.decks.some(d=>d.id===dk)){const d={id:uid(),name:GEN.src.trim().split('\n')[0].slice(0,24)||'AI 카드',created:Date.now()};S.decks.push(d);dk=d.id}
-  items.forEach(x=>S.cards.push(newCard(dk,x.front,x.back,x.hint,x.type)));
+  const gt=parseTags(GEN.tags);
+  items.forEach(x=>{const c=newCard(dk,x.front,x.back,x.hint,x.type);if(gt.length)c.tags=[...new Set([...(c.tags||[]),...gt])];S.cards.push(c)});
   save();GEN.items=[];GEN.deck=dk;toast(items.length+'장 저장됨');go('#deck/'+encodeURIComponent(dk));
 }
 
@@ -1565,10 +1749,76 @@ Object.assign(ACT,{
     closeModal();drawMsgs();toast('대화를 불러왔어요');
   },
   chatDel:({id})=>{S.settings.chats=(S.settings.chats||[]).filter(x=>x.id!==id);save();chatModal()},
+
+  /* ---- 테마 ---- */
+  theme:()=>{const order=['auto','light','dark'],labels={auto:'자동 (시스템 따라)',light:'라이트',dark:'다크'};
+    const cur=S.settings.theme||'auto';const next=order[(order.indexOf(cur)+1)%order.length];
+    S.settings.theme=next;save();applyTheme();rerender();toast('테마: '+labels[next])},
+
+  /* ---- 덱 화면 필터 · 정렬 · 선택 · 일괄 작업 ---- */
+  dfilter:({v})=>{DS.tag=v===undefined?'':String(v);DS.page=1;const [r,id]=curRoute();if(r==='deck')drawCardList(id)},
+  dstar:()=>{DS.star=!DS.star;DS.page=1;const [r,id]=curRoute();if(r==='deck')drawCardList(id)},
+  cPage:({p})=>{DS.page=Math.max(1,+p||1);const [r,id]=curRoute();if(r==='deck')drawCardList(id)},
+  toggleStar:({id})=>{const c=S.cards.find(x=>x.id===id);if(!c)return;c.star=!c.star;c.updated=Date.now();save();rerender()},
+  selClear:()=>{DS.sel.clear();const [r,id]=curRoute();if(r==='deck'){drawCardList(id)}else rerender()},
+  bulkSelAll:()=>{const [r,id]=curRoute();if(r!=='deck')return;
+    S.cards.filter(c=>c.deck===id).forEach(c=>DS.sel.add(c.id));drawCardList(id)},
+  bulkTag:()=>{
+    const ids=[...DS.sel];if(!ids.length)return;
+    openModal(`<h2>${ic(I.tag)}<span>태그 편집 (${ids.length}장)</span>${closeBtn()}</h2>
+    ${fld('태그 (쉼표로 구분)',`<input id="bulkTags" placeholder="예: 시험, 중요" autocomplete="off" value="${esc((() => {const cs=ids.map(i=>S.cards.find(c=>c.id===i)).filter(Boolean);const all=[...new Set(cs.flatMap(c=>c.tags||[]))];return all.join(', ')})())}">`,'기존 태그를 지우려면 입력창을 비우고 저장하세요')}
+    <div class="row" style="justify-content:flex-end"><button class="btn" data-act="close">취소</button><button class="btn pri" data-act="bulkTagOk">저장</button></div>`);
+    setTimeout(()=>$('#bulkTags')?.focus(),50);
+  },
+  bulkTagOk:()=>{
+    const tg=parseTags($('#bulkTags')?.value),ids=new Set(DS.sel);
+    S.cards.forEach(c=>{if(ids.has(c.id)){c.tags=tg;c.updated=Date.now()}});
+    save();closeModal();toast(`태그 ${tg.length?tg.length+'개':'없음'} → 카드 ${ids.size}장 반영`);DS.sel.clear();rerender();
+  },
+  bulkMove:()=>{
+    const ids=[...DS.sel];if(!ids.length)return;
+    openModal(`<h2>${ic(I.copy)}<span>다른 덱으로 이동 (${ids.length}장)</span>${closeBtn()}</h2>
+    ${fld('대상 덱',`<select id="bulkDeck">${S.decks.map(d=>`<option value="${esc(d.id)}">${esc(d.name)}</option>`).join('')}</select>`)}
+    <div class="sub" style="margin-bottom:12px">선택한 카드가 아래 덱으로 이동합니다.</div>
+    <div class="row" style="justify-content:flex-end"><button class="btn" data-act="close">취소</button><button class="btn pri" data-act="bulkMoveOk">이동</button></div>`);
+  },
+  bulkMoveOk:()=>{
+    const dk=$('#bulkDeck').value;if(!S.decks.some(d=>d.id===dk))return toast('덱을 선택하세요');
+    const ids=new Set(DS.sel);let n=0;
+    S.cards.forEach(c=>{if(ids.has(c.id)){c.deck=dk;c.updated=Date.now();n++}});
+    save();closeModal();toast(n+'장 이동했어요');DS.sel.clear();rerender();
+  },
+  bulkStar:()=>{
+    const ids=new Set(DS.sel);if(!ids.size)return;
+    const on=!S.cards.some(c=>ids.has(c.id)&&!c.star); // 하나라도 즐겨찾기 아니면 전부 해제
+    let n=0;S.cards.forEach(c=>{if(ids.has(c.id)){c.star=on;c.updated=Date.now();n++}});
+    save();toast(on?`즐겨찾기 ${n}장 추가`:`즐겨찾기 ${n}장 해제`);DS.sel.clear();rerender();
+  },
+  bulkDel:()=>{
+    const ids=new Set(DS.sel);if(!ids.size)return;
+    if(!confirm(`선택한 카드 ${ids.size}장을 삭제할까요?`))return;
+    S.cards=S.cards.filter(c=>!ids.has(c.id));
+    if(ST)ST.q=ST.q.filter(qid=>!ids.has(qid));
+    DS.sel.clear();save();toast(ids.size+'장 삭제됨');rerender();
+  },
+
+  /* ---- 학습 화면 ---- */
+  revMode:()=>{S.settings.reversed=!S.settings.reversed;save();if(ST)drawStudy();else rerender()},
+  skipCard:()=>{if(!ST)return;ST.q.splice(ST.i,1);resetCardState();stSave();drawStudy()},
 });
 
 /* 이벤트 보강: 검색 UI · 학습 단축키 · 드래그&드롭 · 병합 동기화 */
 document.addEventListener('input',e=>{if(e.target.id==='gsIn'){GS=e.target.value;drawGSearch()}});
+
+// 카드 선택 체크박스 (data-csel) → 일괄 선택 상태 반영
+document.addEventListener('change',e=>{
+  const t=e.target;
+  if(t.dataset.csel!=null){
+    if(t.checked)DS.sel.add(t.dataset.csel);else DS.sel.delete(t.dataset.csel);
+    const [r,id]=curRoute();if(r==='deck')updateSelBar(id);
+    return;
+  }
+});
 
 // 다른 탭과 충돌 없이 병합 (같은 키는 최신 수정 우선, 날짜별 로그는 필드 단위 머지)
 function mergeData(a,b){
@@ -1634,6 +1884,7 @@ document.addEventListener('keydown',e=>{
   if(mod||e.altKey)return;
   if(!$('#modalBg').classList.contains('show')&&e.key==='?'&&!(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT')){e.preventDefault();helpModal();return}
   if(ST&&!$('#modalBg').classList.contains('show')&&!(tag==='INPUT'||tag==='TEXTAREA'||tag==='BUTTON')){
+    if(e.code==='KeyF'){e.preventDefault();ACT.revMode();return}
     if(e.key==='ArrowRight'){e.preventDefault();if(ST.show)grade(3);else{ST.i++;resetCardState();drawStudy()}return}
     if(e.key==='ArrowLeft'){e.preventDefault();ST.i=Math.max(0,ST.i-1);resetCardState();drawStudy();return}
     if(e.code==='KeyN'){e.preventDefault();const c=curCard();ACT.addCard({id:ST.deck||(c&&c.deck)||''});return}
@@ -1692,7 +1943,7 @@ window.addEventListener('drop',e=>{
 Object.assign(ACT,{expStats:()=>exportStatsCsv()});
 
 
-load();
+load();applyTheme();
 pmLoad();pmDraw();
 $('#topSet').innerHTML=ic(I.gear);
 route();
