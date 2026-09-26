@@ -321,8 +321,15 @@ function toast(m,ms=2600){LAST_TOAST=m;const t=$('#toast');t.textContent=m;t.cla
 function openModal(html){$('#modal').innerHTML=html;$('#modalBg').classList.add('show')}
 function closeModal(){$('#modalBg').classList.remove('show')}
 function download(name,text,type='application/json'){
-  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;
-  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  // URL.createObjectURL 미지원 환경(jsdom·구버전 브라우저)에서도 오류 없이 동작
+  let url=null;
+  try{if(typeof URL!=='undefined'&&URL.createObjectURL)url=URL.createObjectURL(new Blob([text],{type}))}catch{}
+  if(!url){ // data URL 폴백(UTF-8 인코딩)
+    url='data:'+type+';charset=utf-8,'+encodeURIComponent(text);
+  }
+  const a=document.createElement('a');a.href=url;a.download=name;a.rel='noopener';
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>{try{if(url.startsWith('blob:')&&URL.revokeObjectURL)URL.revokeObjectURL(url)}catch{}},1000);
 }
 // fetch + 타임아웃 + 알기 쉬운 오류
 async function fetchJ(url,opt={},ms=60000){
@@ -414,6 +421,13 @@ function load(){
   // 삭제 이력 적용: 한 번 삭제된 덱의 카드는 다시 나타나지 않는다 (백업/병합으로 되살아나는 버그 차단)
   S.cards=S.cards.filter(c=>!delTomb[c.deck]);
   if(!S.log||typeof S.log!=='object')S.log={};
+  // 삭제 이력(delTomb)에 있는 덱은 메모리에서도 제거 — 다른 탭 병합·구버전 저장본이
+  // 이미 삭제한 덱을 되살려 '전체 학습'에 다시 나오는 버그 차단 (tombstone 우선 원칙)
+  if(Object.keys(delTomb).length){
+    S.decks=S.decks.filter(d=>!delTomb[d.id]);
+    const alive=new Set(S.decks.map(d=>d.id));
+    S.cards=S.cards.filter(c=>alive.has(c.deck)&&!delTomb[c.deck]);
+  }
   // 백업·부분 저장 데이터에서 필드 누락 시 기본값 보정 (학습 중 undefined 오류 방지)
   for(const c of S.cards){
     if(typeof c.deck!=='string')c.deck='';
@@ -434,7 +448,8 @@ function load(){
   // 학습 기록이 전혀 없는 빈 데이터가 디스크에 남아 있으면 시드 복구 (홈·통계가 마냥 비어 보이는 문제 방지)
   if(d&&S.decks.length===0&&S.cards.length===0&&!Object.keys(S.log).length){seed();save()}
   // 덱·카드 무결성: 카드의 덱이 실존하지 않으면 새 기본 덱을 만들어 편입 (고아 카드 유실 방지)
-  let orphans=S.cards.filter(c=>!S.decks.some(x=>x.id===c.deck));
+  let orphans=S.cards.filter(c=>!S.decks.some(x=>x.id===c.deck)&&!delTomb[c.deck]);
+  S.cards=S.cards.filter(c=>S.decks.some(x=>x.id===c.deck)); // 여전히 고아(삭제 이력 있음)는 유실 처리
   if(orphans.length){
     if(!S.decks.length){const g={id:uid(),name:'기본 덱',created:Date.now()};S.decks.push(g);orphans.forEach(c=>c.deck=g.id)}
     else{const d0=S.decks[0];orphans.forEach(c=>c.deck=d0.id)}
@@ -443,7 +458,15 @@ function load(){
 }
 function bumpVer(){try{localStorage.setItem('memoryall-ver',String(Date.now()+Math.random()))}catch{}} // 다른 탭에 변경 알림용
 let LAST_GOOD=null;
-function save(){try{const j=JSON.stringify({...S,delTomb});localStorage.setItem(KEY,j);LAST_GOOD=j;bumpVer()}catch{toast('저장 공간이 부족합니다. 백업 후 정리하세요',4000)}}
+function save(){
+  let j;
+  try{j=JSON.stringify({...S,delTomb})}catch(e){console.error('save serialize',e);return} // 직렬화 오류는 조용히 무시(데이터 보존)
+  try{localStorage.setItem(KEY,j);LAST_GOOD=j;bumpVer()}
+  catch(e){ // 용량 초과만 '가득 참' 안내 — 나머지 오류는 개발자 콘솔로 노출(버그 은폐 방지)
+    if(e&&(e.name==='QuotaExceededError'||e.code===22||e.code===1014))toast('저장 공간이 부족합니다. 백업 후 정리하세요',4000);
+    else console.error('save',e);
+  }
+}
 
 /* ================= 4. 간격 반복 엔진 (SM-2 기반, 순수 함수) ================= */
 const TYPES={basic:'기본',cloze:'빈칸',vocab:'단어'};
@@ -849,7 +872,7 @@ const resetCardState=()=>Object.assign(ST,{show:false,hint:false,picked:null,cho
 // 학습 상태 (ST) — 새로고침 후에도 이어서 학습할 수 있도록 localStorage 스냅샷 사용
 const STK='memoryall-st';
 let ST=null;
-function stSave(){try{if(ST&&ST.q.length&&ST.i<ST.q.length)localStorage.setItem(STK,JSON.stringify({deck:ST.deck,q:ST.q.slice(ST.i),done:ST.done,ok:ST.ok||0,mode:ST.mode,f:ST.f||null,t0:ST.t0}));else if(ST)localStorage.removeItem(STK)}catch{}}
+function stSave(){try{if(!ST)return;if(ST.q&&ST.q.length&&ST.i<ST.q.length)localStorage.setItem(STK,JSON.stringify({deck:ST.deck,q:ST.q.slice(ST.i),done:ST.done,ok:ST.ok||0,mode:ST.mode,f:ST.f||null,t0:ST.t0}));else localStorage.removeItem(STK)}catch{}}
 function stLoad(){try{const d=safeJSON(localStorage.getItem(STK)||'null');if(d&&Array.isArray(d.q)&&d.q.length){const ids=new Set(S.cards.map(c=>c.id));d.q=d.q.filter(id=>ids.has(id));if(!d.q.length){localStorage.removeItem(STK);return null}return d}}catch{}return null}
 function startStudy(arg){
   const id=arg&&arg!=='all'?arg:null;
