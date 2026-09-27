@@ -321,8 +321,15 @@ function toast(m,ms=2600){LAST_TOAST=m;const t=$('#toast');t.textContent=m;t.cla
 function openModal(html){$('#modal').innerHTML=html;$('#modalBg').classList.add('show')}
 function closeModal(){$('#modalBg').classList.remove('show')}
 function download(name,text,type='application/json'){
-  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;
-  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  // URL.createObjectURL 미지원 환경(jsdom·구버전 브라우저)에서도 오류 없이 동작
+  let url=null;
+  try{if(typeof URL!=='undefined'&&URL.createObjectURL)url=URL.createObjectURL(new Blob([text],{type}))}catch{}
+  if(!url){ // data URL 폴백(UTF-8 인코딩)
+    url='data:'+type+';charset=utf-8,'+encodeURIComponent(text);
+  }
+  const a=document.createElement('a');a.href=url;a.download=name;a.rel='noopener';
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>{try{if(url.startsWith('blob:')&&URL.revokeObjectURL)URL.revokeObjectURL(url)}catch{}},1000);
 }
 // fetch + 타임아웃 + 알기 쉬운 오류
 async function fetchJ(url,opt={},ms=60000){
@@ -401,7 +408,7 @@ function seed(){
 function load(){
   const raw=localStorage.getItem(KEY),d=raw?safeJSON(raw):null;
   const def=JSON.parse(JSON.stringify(DEF_SETTINGS));
-  S={decks:[],cards:[],log:{},...(d&&typeof d==='object'?d:{})};
+  S={decks:[],cards:[],log:{},sessions:{},marks:{},notes:{},undo:[],...(d&&typeof d==='object'?d:{})};
   delTomb=(d&&d.delTomb&&typeof d.delTomb==='object')?d.delTomb:{};
   const st=S.settings||{};
   S.settings={...def,...st,ai:{...def.ai,...(st.ai||{})},search:{...def.search,...(st.search||{})},mcp:Array.isArray(st.mcp)?st.mcp:[]};
@@ -414,6 +421,13 @@ function load(){
   // 삭제 이력 적용: 한 번 삭제된 덱의 카드는 다시 나타나지 않는다 (백업/병합으로 되살아나는 버그 차단)
   S.cards=S.cards.filter(c=>!delTomb[c.deck]);
   if(!S.log||typeof S.log!=='object')S.log={};
+  // 삭제 이력(delTomb)에 있는 덱은 메모리에서도 제거 — 다른 탭 병합·구버전 저장본이
+  // 이미 삭제한 덱을 되살려 '전체 학습'에 다시 나오는 버그 차단 (tombstone 우선 원칙)
+  if(Object.keys(delTomb).length){
+    S.decks=S.decks.filter(d=>!delTomb[d.id]);
+    const alive=new Set(S.decks.map(d=>d.id));
+    S.cards=S.cards.filter(c=>alive.has(c.deck)&&!delTomb[c.deck]);
+  }
   // 백업·부분 저장 데이터에서 필드 누락 시 기본값 보정 (학습 중 undefined 오류 방지)
   for(const c of S.cards){
     if(typeof c.deck!=='string')c.deck='';
@@ -434,7 +448,8 @@ function load(){
   // 학습 기록이 전혀 없는 빈 데이터가 디스크에 남아 있으면 시드 복구 (홈·통계가 마냥 비어 보이는 문제 방지)
   if(d&&S.decks.length===0&&S.cards.length===0&&!Object.keys(S.log).length){seed();save()}
   // 덱·카드 무결성: 카드의 덱이 실존하지 않으면 새 기본 덱을 만들어 편입 (고아 카드 유실 방지)
-  let orphans=S.cards.filter(c=>!S.decks.some(x=>x.id===c.deck));
+  let orphans=S.cards.filter(c=>!S.decks.some(x=>x.id===c.deck)&&!delTomb[c.deck]);
+  S.cards=S.cards.filter(c=>S.decks.some(x=>x.id===c.deck)); // 여전히 고아(삭제 이력 있음)는 유실 처리
   if(orphans.length){
     if(!S.decks.length){const g={id:uid(),name:'기본 덱',created:Date.now()};S.decks.push(g);orphans.forEach(c=>c.deck=g.id)}
     else{const d0=S.decks[0];orphans.forEach(c=>c.deck=d0.id)}
@@ -443,7 +458,15 @@ function load(){
 }
 function bumpVer(){try{localStorage.setItem('memoryall-ver',String(Date.now()+Math.random()))}catch{}} // 다른 탭에 변경 알림용
 let LAST_GOOD=null;
-function save(){try{const j=JSON.stringify({...S,delTomb});localStorage.setItem(KEY,j);LAST_GOOD=j;bumpVer()}catch{toast('저장 공간이 부족합니다. 백업 후 정리하세요',4000)}}
+function save(){
+  let j;
+  try{j=JSON.stringify({...S,delTomb})}catch(e){console.error('save serialize',e);return} // 직렬화 오류는 조용히 무시(데이터 보존)
+  try{localStorage.setItem(KEY,j);LAST_GOOD=j;bumpVer()}
+  catch(e){ // 용량 초과만 '가득 참' 안내 — 나머지 오류는 개발자 콘솔로 노출(버그 은폐 방지)
+    if(e&&(e.name==='QuotaExceededError'||e.code===22||e.code===1014))toast('저장 공간이 부족합니다. 백업 후 정리하세요',4000);
+    else console.error('save',e);
+  }
+}
 
 /* ================= 4. 간격 반복 엔진 (SM-2 기반, 순수 함수) ================= */
 const TYPES={basic:'기본',cloze:'빈칸',vocab:'단어'};
@@ -458,7 +481,7 @@ function deckCounts(id){
 }
 function logReview(ok,isNew){const k=dayKey(),l=S.log[k]||(S.log[k]={n:0,ok:0,nw:0});l.n++;if(ok)l.ok++;if(isNew)l.nw++;(l.hs||(l.hs=[])).push(new Date().getHours())}
 // 세션 기록 (오늘의 학습 이력 타임라인·목표 진행용). 최대 300개 유지로 저장소 보호
-function logSession(){const k=dayKey();const ss=S.sessions&&Array.isArray(S.sessions[k])?S.sessions[k]:(S.sessions={...(S.sessions||{}),[k]:[]});ss.push({t:Date.now(),deck:S._sessDeck||null,n:S._sessN||0,ok:S._sessOk||0,dur:S._sessDur||0});if(ss.length>300)ss.splice(0,ss.length-300)}
+function logSession(x={}){const k=dayKey();if(!S.sessions||typeof S.sessions!=='object')S.sessions={};const ss=Array.isArray(S.sessions[k])?S.sessions[k]:(S.sessions[k]=[]);ss.push({t:+x.t||Date.now(),deck:x.deck??null,n:+x.n||0,ok:+x.ok||0,dur:+x.dur||0});if(ss.length>300)ss.splice(0,ss.length-300)}
 function todaySecs(){let s=0;for(const k in (S.sessions||{}))(S.sessions[k]||[]).forEach(x=>{if(typeof x.dur==='number')s+=x.dur;else if(+x.t>=startOfDay())s+=Math.min(1800,(Date.now()-+x.t)/1000)});return s}
 function goalDone(){return (S.log[dayKey()]?.n||0)>=Math.max(1,+S.settings.goal||30)}
 function checkGoal(){
@@ -470,6 +493,64 @@ function streakBest(){let best=0,s=0,t=startOfDay()+DAY/2;if(!S.log[dayKey(t)])t
 function totalStudied(){let n=0;for(const k in S.log)n+=(+S.log[k].n||0);return n}
 function streak(){let s=0,t=startOfDay()+DAY/2;if(!S.log[dayKey(t)])t-=DAY;while(S.log[dayKey(t)]){s++;t-=DAY}return s}
 function weakCards(n=10){return S.cards.filter(c=>c.last&&(c.lapses>0||c.ef<2.3)).sort((a,b)=>b.lapses-a.lapses||a.ef-b.ef).slice(0,n)}
+
+/* ===== 확장 기능: 성취 뱃지 · 오답노트(실수집) · 난이도 필터 · 세션 리포트 ===== */
+const ACH=[
+  {id:'first',   ic:'⭐',n:'첫걸음',      d:'첫 카드 복습 완료',            f:s=>totalStudied()>=1},
+  {id:'study50', ic:'📚',n:'열심러',      d:'누적 50장 복습',               f:s=>totalStudied()>=50},
+  {id:'study500',ic:'🏛️',n:'수천의 기억', d:'누적 500장 복습',              f:s=>totalStudied()>=500},
+  {id:'streak3', ic:'🔥',n:'불꽃 3일',    d:'3일 연속 학습',                f:s=>streak()>=3},
+  {id:'streak7', ic:'🌋',n:'일주일 불꽃', d:'7일 연속 학습',                f:s=>streak()>=7},
+  {id:'streak30',ic:'🗓️',n:'한 달의 습관',d:'30일 연속 학습',               f:s=>streak()>=30},
+  {id:'goal',    ic:'🎯',n:'목표 달성',   d:'하루 목표 전부 달성',          f:s=>!!S.log[dayKey()]?.goal},
+  {id:'perfect', ic:'💯',n:'퍼펙트 세션', d:'한 세션 10장 이상 전부 정답',   f:s=>s.perfect},
+  {id:'deck5',   ic:'🗂️',n:'컬렉터',      d:'덱 5개 보유',                  f:s=>S.decks.length>=5},
+  {id:'card100', ic:'🃏',n:'카드 100장',  d:'카드 100장 보유',              f:s=>S.cards.length>=100},
+  {id:'star10',  ic:'✨',n:'즐겨찾기 10', d:'즐겨찾기 카드 10장',           f:s=>S.cards.filter(c=>c.star).length>=10},
+  {id:'tagger',  ic:'🏷️',n:'태그 마스터', d:'태그 10종 사용',               f:s=>tagList().length>=10},
+  {id:'gen',     ic:'🤖',n:'AI 동맹',     d:'AI로 카드 생성 경험',          f:s=>s.gen},
+  {id:'tutor',   ic:'💬',n:'튜터와 대화', d:'AI 튜터에게 질문하기',         f:s=>s.tutor},
+  {id:'import',  ic:'📥',n:'수집가',      d:'파일 가져오기 사용',           f:s=>s.import},
+  {id:'backup',  ic:'🔐',n:'안전 전문가', d:'백업 내보내기 사용',           f:s=>s.backup},
+  {id:'weak10',  ic:'💪',n:'약점 극복',   d:'어려운 카드 10장 정복(ef≥2.5)',f:s=>S.cards.filter(c=>c.reps>=3&&c.ef>=2.5&&c.lapses>0).length>=10}
+];
+function achStats(){
+  const s={perfect:false,gen:false,tutor:false,import:false,backup:false};
+  for(const k in (S.sessions||{}))for(const x of (S.sessions[k]||[]))if(x.n>=10&&x.ok===x.n)s.perfect=true;
+  try{const g=JSON.parse(localStorage.getItem('memoryall-achflags')||'{}');Object.assign(s,g)}catch{}
+  return s;
+}
+function achFlag(k){try{const g=JSON.parse(localStorage.getItem('memoryall-achflags')||'{}');g[k]=true;localStorage.setItem('memoryall-achflags',JSON.stringify(g))}catch{}}
+function checkAch(){ // 화면 전환 시 호출 — 신규 획득만 토스트
+  try{
+    const seen=(S.settings.ach||(S.settings.ach={})),st=achStats();
+    let fresh=0;
+    for(const a of ACH){if(!seen[a.id]&&a.f(st)){seen[a.id]=Date.now();fresh++;toast(`${a.ic} 성취 획득: ${a.n}`,3500)}}
+    if(fresh)save();
+  }catch(e){console.error('ach',e)}
+}
+// 오답노트: lapse 기준 + 최근 오답 로그(S.marks) 병합
+function markWrong(id){if(!S.marks||typeof S.marks!=='object')S.marks={};const m=S.marks[id]||{n:0,t:0};m.n++;m.t=Date.now();S.marks[id]=m;if(Object.keys(S.marks).length>600){const ks=Object.keys(S.marks).sort((a,b)=>S.marks[a].t-S.marks[b].t);ks.slice(0,ks.length-600).forEach(k=>delete S.marks[k])}}
+function wrongList(){
+  const ids=new Set(S.cards.filter(c=>c.lapses>0).map(c=>c.id));
+  for(const id in (S.marks||{}))if(+S.marks[id]?.n>0)ids.add(id);
+  return S.cards.filter(c=>ids.has(c.id)).sort((a,b)=>(b.lapses||0)-(a.lapses||0)||(S.marks[b.id]?.n||0)-(S.marks[a.id]?.n||0));
+}
+function clearWrong(id){S.marks&&(delete S.marks[id]);const c=S.cards.find(x=>x.id===id);if(c)c.lapses=0}
+// 난이도: reps/ef/lapses 기반 점수 → new/easy/med/hard
+const diffScore=c=>(c.reps||0)*0.7+(c.ef?Math.min(3,c.ef):0)+((c.lapses||0)?-1.2:0);
+const diffOf=c=>!c.last?'new':diffScore(c)>=3.4?'easy':diffScore(c)>=2.2?'med':'hard';
+const DIFFN={new:'신규',easy:'쉬움',med:'보통',hard:'어려움'};
+// 세션 리포트 모달 (완료 화면·오늘의 이력에서 사용)
+function sessionReportModal(sess,label){
+  const dk=sess.deck?S.decks.find(d=>d.id===sess.deck):null;
+  openModal(`<div class="mcard"><div class="row" style="justify-content:space-between"><h2>세션 리포트</h2>${closeBtn()}</div>
+  <p class="sub">${esc(label)}${dk?' · '+esc(dk.name):' · 전체 학습'}</p>
+  <div class="grid" style="margin:12px 0">
+    ${statBox('복습',sess.n+'장','study')}${statBox('정답률',(sess.n?Math.round(sess.ok/sess.n*100):0)+'%','check')}${statBox('시간',fmtDur(sess.dur),'clock')}</div>
+  ${(sess.w&&sess.w.length)?`<div class="stack" style="gap:6px;margin-bottom:10px">${sess.w.slice(0,8).map(t=>`<div class="pill" style="white-space:normal">⚠️ ${esc(t)}</div>`).join('')}</div><p class="sub" style="margin-bottom:12px">위 카드는 오답노트에 남았어요 · <a href="#stats" data-act="close">통계에서 관리</a></p>`:'<p class="sub" style="margin-bottom:12px">이번 세션에서 틀린 카드가 없었어요 👏</p>'}
+  <div class="row" style="justify-content:flex-end"><button class="btn pri" data-act="close">확인</button></div></div>`);
+}
 
 // g: 1 다시, 2 어려움, 3 좋음, 4 쉬움 → 새 상태 반환 (원본 불변)
 function nextState(c,g){
@@ -783,6 +864,7 @@ function vHome(){
     <div class="row" style="justify-content:space-between;margin-bottom:8px"><b style="font-size:13.5px;display:flex;align-items:center;gap:6px">${ic(I.target)}오늘의 목표 ${fmtNum(g)}장</b>
       <span class="sub">${todayL.n>=g?'달성했습니다! 🎉':`${Math.max(0,g-todayL.n)}장 남았어요`} · 학습 ${fmtDur(todaySecs())} · ${streak()}일 연속 (최고 ${streakBest()}일)</span></div>
     <div class="progress"><i style="width:${Math.min(100,todayL.n/g*100)}%;background:${todayL.n>=g?'var(--green)':'var(--accent)'}"></i></div></div>
+  ${(()=>{const ss=((S.sessions||{})[dayKey()]||[]).slice(-5).reverse();return ss.length?`<div class="card" style="margin-bottom:22px;padding:14px 18px"><b style="font-size:13.5px;display:flex;align-items:center;gap:6px;margin-bottom:8px">${ic(I.clock)}오늘의 학습 이력</b><div class="stack" style="gap:6px">${ss.map((x,i)=>{const t=new Date(+x.t),dk=x.deck?(S.decks.find(d=>d.id===x.deck)||{}).name||'전체 학습':'전체 학습';return `<div class="row" style="justify-content:space-between;font-size:13px"><span>${t.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})} · ${esc(dk)} · ${x.n}장 ${x.n?Math.round(x.ok/x.n*100):0}% · ${fmtDur(x.dur||0)}</span><button class="mini" data-act="sessionDetail" data-s="${i}">리포트</button></div>`}).join('')}</div></div>`:''})()}
   ${all.due+nw?`<a class="btn pri" href="#study/all" style="width:100%;padding:13px;margin-bottom:26px">${ic(I.play)}전체 학습 시작 (${all.due+nw}장)</a>`:`<div class="card empty" style="margin-bottom:26px;padding:22px">오늘 할 복습을 모두 끝냈어요<div class="row" style="justify-content:center;margin-top:12px"><a class="btn sm" href="#stats">${ic(I.chart)}통계 보기</a><a class="btn sm" href="#gen">${ic(I.spark)}새 카드 만들기</a></div></div>`}
   <h2>${ic(I.study)}내 덱 <span class="sub" style="font-weight:400;font-size:12.5px">카드를 다른 덱으로 드래그할 수 있어요</span></h2>
   ${S.decks.length?`<div class="grid">${S.decks.map(d=>{const c=deckCounts(d.id);return `<div class="card deck" data-drop="1" data-id="${esc(d.id)}" data-act="openDeck" draggable="false"><div class="name">${esc(d.name)}</div><div class="pills"><span class="pill b">복습 ${c.due}</span><span class="pill g">새 ${c.nw}</span><span class="pill">전체 ${c.total}</span></div></div>`}).join('')}</div>`
@@ -846,10 +928,11 @@ function updateSelBar(id){
 /* ---------- 학습 ---------- */
 const curCard=()=>ST&&S.cards.find(c=>c.id===ST.q[ST.i]);
 const resetCardState=()=>Object.assign(ST,{show:false,hint:false,picked:null,choices:null,typed:null,correct:null});
+let LAST_SESSION=null; // 방금 완료한 세션 (리포트 모달용)
 // 학습 상태 (ST) — 새로고침 후에도 이어서 학습할 수 있도록 localStorage 스냅샷 사용
 const STK='memoryall-st';
 let ST=null;
-function stSave(){try{if(ST&&ST.q.length&&ST.i<ST.q.length)localStorage.setItem(STK,JSON.stringify({deck:ST.deck,q:ST.q.slice(ST.i),done:ST.done,ok:ST.ok||0,mode:ST.mode,f:ST.f||null,t0:ST.t0}));else if(ST)localStorage.removeItem(STK)}catch{}}
+function stSave(){try{if(!ST)return;if(ST.q&&ST.q.length&&ST.i<ST.q.length)localStorage.setItem(STK,JSON.stringify({deck:ST.deck,q:ST.q.slice(ST.i),done:ST.done,ok:ST.ok||0,mode:ST.mode,f:ST.f||null,t0:ST.t0}));else localStorage.removeItem(STK)}catch{}}
 function stLoad(){try{const d=safeJSON(localStorage.getItem(STK)||'null');if(d&&Array.isArray(d.q)&&d.q.length){const ids=new Set(S.cards.map(c=>c.id));d.q=d.q.filter(id=>ids.has(id));if(!d.q.length){localStorage.removeItem(STK);return null}return d}}catch{}return null}
 function startStudy(arg){
   const id=arg&&arg!=='all'?arg:null;
@@ -874,12 +957,14 @@ function drawStudy(){
   const c=curCard();
   if(!c){
     const doneN=ST.done,okN=ST.ok||0,dur=Math.round((Date.now()-(ST.t0||Date.now()))/1000); // 완료 장면을 먼저 계산한 뒤 학습 상태 정리
-    if(doneN)logSession({t:Date.now(),deck:ST.deck,n:doneN,ok:okN,dur});
-    localStorage.removeItem(STK);ST=null;checkGoal();rerender();
+    if(doneN){const wIds=(ST.w||[]);const wn=wIds.map(id=>{const cc=S.cards.find(x=>x.id===id);return cc?String(cc.front).slice(0,60):''}).filter(Boolean).slice(0,20);logSession({t:Date.now(),deck:ST.deck,n:doneN,ok:okN,dur,w:wn});save();const dkName=ST.deck?(S.decks.find(d=>d.id===ST.deck)||{}).name||'전체 학습':'전체 학습';LAST_SESSION=Object.assign({},((S.sessions||{})[dayKey()]||[]).slice(-1)[0]||{},{label:dkName})}
+    localStorage.removeItem(STK);ST=null;checkGoal();checkAch();rerender();
     M(`<div class="head"><div class="row"><a class="icon-btn" href="${back}">${ic(I.back)}</a><h1>${title}</h1></div></div><div class="card empty">
     ${doneN?`<div class="bigic" style="background:#ecfdf5;color:var(--green)">${ic(I.check)}</div><h2 style="justify-content:center">학습 완료</h2><p>${doneN}장을 복습했어요 · 정답 ${Math.round(okN/doneN*100)}% · ${fmtDur(dur)} · 연속 ${streak()}일째!</p>`
     :`<div class="bigic" style="background:var(--accent-soft);color:var(--accent)">${ic(I.clock)}</div><h2 style="justify-content:center">지금 학습할 카드가 없어요</h2><p>새 카드를 추가하거나 AI로 만들어 보세요.</p>`}
-    <div class="row" style="justify-content:center;margin-top:18px"><a class="btn" href="#home">홈으로</a><a class="btn pri" href="#gen">${ic(I.spark)}AI로 카드 만들기</a></div></div>`);
+    <div class="row" style="justify-content:center;margin-top:18px;flex-wrap:wrap">
+      ${doneN&&ST?.deck?`<button class="btn" data-act="sessionDetail">세션 리포트</button>`:''}
+      <a class="btn" href="#home">홈으로</a><a class="btn pri" href="#gen">${ic(I.spark)}AI로 카드 만들기</a></div></div>`);
     return;
   }
   const a=ansText(c),left=ST.q.length-ST.i,pct=ST.done/(ST.done+left)*100;
@@ -928,7 +1013,7 @@ function grade(g){
   else if(ST.mode==='type'&&ST.typed!=null)ok=!!ST.correct;
   if(idx>-1){
     const isNew=!S.cards[idx].last;
-    S.cards[idx]={...nextState(S.cards[idx],g),updated:Date.now()};logReview(ok,isNew);if(ok)ST.ok=(ST.ok||0)+1;save();
+    S.cards[idx]={...nextState(S.cards[idx],g),updated:Date.now()};logReview(ok,isNew);if(!ok){markWrong(id);(ST.w||(ST.w=[])).includes(id)||ST.w.push(id)}if(ok)ST.ok=(ST.ok||0)+1;save();
     navigator.vibrate?.(g===1?[30,40,30]:15);
     if(g===1)ST.q.splice(Math.min(ST.q.length,ST.i+4),0,id); // 틀린 카드는 몇 장 뒤에 다시
   }else{
@@ -1181,7 +1266,11 @@ function vStats(){
     <div class="pills">${Object.entries(TYPES).map(([k,v])=>`<span class="pill a">${v} ${byType[k]||0}장</span>`).join('')}</div>
     <div class="progress" style="margin-top:10px">${Object.entries(TYPES).map(([k,v],i)=>`<i style="float:left;width:${(byType[k]||0)/S.cards.length*100}%;margin-left:${Object.entries(TYPES).slice(0,i).reduce((a,[kk])=>a+(byType[kk]||0)/S.cards.length*100,0)}%;background:${['var(--accent)','#818cf8','#a5b4fc'][i]||'var(--accent)'}"></i>`).join('')}</div></div>`:''}
   <div class="card"><h2 style="justify-content:space-between"><span class="row" style="gap:8px">${ic(I.alert)}약한 카드</span>${weak.length?`<button class="btn sm" data-act="weakAsk">${ic(I.spark)}AI 암기법 받기</button>`:''}</h2>
-  ${weak.length?`<div class="list">${weak.map(c=>`<div class="item"><div class="tx"><div class="f">${esc(prev(c.front))}</div><div class="b">${esc(ansText(c))}</div></div><span class="pill r">틀림 ${c.lapses}</span><button class="icon-btn" data-act="editCard" data-id="${esc(c.id)}">${ic(I.edit)}</button></div>`).join('')}</div>`:'<div class="empty">아직 약한 카드가 없어요</div>'}</div>`);
+  ${weak.length?`<div class="list">${weak.map(c=>`<div class="item"><div class="tx"><div class="f">${esc(prev(c.front))}</div><div class="b">${esc(ansText(c))}</div></div><span class="pill r">틀림 ${c.lapses}</span><button class="icon-btn" data-act="editCard" data-id="${esc(c.id)}">${ic(I.edit)}</button></div>`).join('')}</div>`:'<div class="empty">아직 약한 카드가 없어요</div>'}</div>
+  <div class="card" style="margin-top:14px"><h2 style="justify-content:space-between"><span class="row" style="gap:8px">${ic(I.x)}오답노트 (${wrongList().length})</span>${wrongList().length?`<button class="btn sm pri" data-act="studyWrong">${ic(I.play)}오답만 학습</button>`:''}</h2>
+  ${wrongList().length?`<div class="list">${wrongList().slice(0,15).map(c=>`<div class="item"><div class="tx"><div class="f">${esc(prev(c.front))}</div><div class="b">${esc(ansText(c))}</div></div><span class="pill r">오답 ${(S.marks[c.id]?.n||0)+(c.lapses||0)}회</span><button class="mini" data-act="clearWrong" data-id="${esc(c.id)}" title="오답노트에서 지움">✓</button><button class="icon-btn" data-act="editCard" data-id="${esc(c.id)}">${ic(I.edit)}</button></div>`).join('')}</div>`:'<div class="empty">오답노트가 비어 있어요 🎉</div>'}</div>
+  <div class="card" style="margin-top:14px"><h2>${ic(I.star)}성취 뱃지 (${Object.keys(S.settings.ach||{}).length}/${ACH.length})</h2>
+  <div class="pills" style="gap:8px">${ACH.map(a=>{const got=!!(S.settings.ach||{})[a.id];return `<span class="pill ${got?'g':''}" title="${esc(a.d)}" style="${got?'':'opacity:.4;filter:grayscale(1)'}">${a.ic} ${esc(a.n)}</span>`}).join('')}</div></div>`);
 }
 
 /* ---------- 설정 ---------- */
@@ -1212,7 +1301,8 @@ function vSettings(){
     ${fld('인증 토큰 (선택)','<input id="mTok" type="password" placeholder="Bearer 토큰" autocomplete="off">')}
     <button class="btn" data-act="mcpAdd">${ic(I.plus)}서버 추가</button></div>
   <div class="card"><h2>${ic(I.study)}학습</h2>
-    <div class="two">${fld('하루 새 카드 수',inp('newPerDay',s.newPerDay,'20','number'))}${fld('기본 학습 방식',sel('mode',s.mode,{flash:'플래시카드',quiz:'객관식',type:'직접 입력'}))}</div>
+    <div class="two">${fld('하루 새 카드 수',inp('newPerDay',s.newPerDay,'20','number'))}${fld('오늘 목표 장수 (1~999)',inp('goal',s.goal??30,'30','number'))}</div>
+    <div class="two">${fld('기본 학습 방식',sel('mode',s.mode,{flash:'플래시카드',quiz:'객관식',type:'직접 입력'}))}</div>
     ${fld('음성 언어',sel('ttsLang',s.ttsLang,{auto:'자동 감지','ko-KR':'한국어','en-US':'영어 (미국)','en-GB':'영어 (영국)','ja-JP':'일본어','zh-CN':'중국어','es-ES':'스페인어','fr-FR':'프랑스어','de-DE':'독일어'}))}</div>
   <div class="card"><h2>${ic(I.clock)}뽀모도로</h2>
     <div class="two">${fld('집중 시간 (1~180분)',inp('pmWork',s.pmWork??25,'25','number'))}${fld('휴식 시간 (1~60분)',inp('pmBreak',s.pmBreak??5,'5','number'))}</div>
@@ -1236,6 +1326,7 @@ function setPath(p,v){
   const k=p.split('.');let o=S.settings;
   while(k.length>1)o=o[k.shift()];
   if(p==='newPerDay')v=Math.max(0,Math.min(9999,parseInt(v)||0));
+  if(p==='goal')v=Math.max(1,Math.min(999,parseInt(v)||30));
   if(p==='pmWork'){v=Math.min(180,Math.max(1,parseInt(v)||25));S.settings.pmBreak=Math.min(S.settings.pmBreak??5,60);PM_LEN.work=v*60;if(!PM.run&&PM.mode==='work')PM.left=v*60}
   if(p==='pmBreak'){v=Math.min(60,Math.max(1,parseInt(v)||5));PM_LEN.break=v*60;if(!PM.run&&PM.mode==='break')PM.left=v*60}
   o[k[0]]=v;
