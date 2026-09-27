@@ -441,6 +441,9 @@ function load(){
     if(typeof c.created!=='number')c.created=Date.now();
   }
   if(!d){seed();save()}
+  // 저장된 설정값 범위 보정: goal은 로드 시점에도 1~999로 클램프 (setPath만 믿으면 백업/타탭 병합으로 -5 같은 값이 유입됨)
+  {const gv=+S.settings.goal;if(!Number.isFinite(gv)||gv<1||gv>999)S.settings.goal=30;else S.settings.goal=Math.round(gv)}
+  const gvw=+S.settings.newPerDay;if(!Number.isFinite(gvw)||gvw<0||gvw>9999)S.settings.newPerDay=20;else S.settings.newPerDay=Math.round(gvw)
   // log 항목도 형태 보정 (손상된 로그로 인한 통계 화면 오류 방지)
   for(const k in S.log){const l=S.log[k];if(!l||typeof l!=='object'){delete S.log[k];continue}
     l.n=+l.n||0;l.ok=+l.ok||0;l.nw=+l.nw||0;if(l.ok>l.n)l.ok=l.n;
@@ -1720,7 +1723,10 @@ function offlineGen(){
 /* 통계 확장 */
 function hourHeat(){
   const h=new Array(24).fill(0);
-  for(const k in S.log)(S.log[k].hs||[]).forEach(i=>{if(i>=0&&i<24)h[i]++});
+  // hs는 두 형태를 모두 지원: (a) 히스토그램(≤24, 인덱스=시간 값=횟수) — 구버전 저장본, (b) 시간 목록(각 요소가 0~23 시간) — 현행 logReview
+  for(const k in S.log){const a=S.log[k].hs;if(!Array.isArray(a))continue;
+    if(a.length<=24&&a.every(v=>Number.isInteger(v)&&v>=0)){a.forEach((v,i)=>{if(i<24)h[i]+=+v||0})}
+    else a.forEach(i=>{if(i>=0&&i<24)h[i|0]++})}
   const mx=Math.max(1,...h);
   return `<div class="grid" style="grid-template-columns:repeat(12,1fr);gap:4px">${h.map((v,i)=>`<div title="${i}시 · ${v}장" style="height:26px;border-radius:6px;background:${v?`rgba(79,70,229,${(.15+.85*v/mx).toFixed(2)})`:'var(--bg)'};display:flex;align-items:center;justify-content:center;font-size:10px;color:${v/mx>.5?'#fff':'var(--sub)'}">${i}</div>`).join('')}</div>`;
 }
@@ -2040,7 +2046,7 @@ $('#topSet').innerHTML=ic(I.gear);
 route();
 
 // 진단/자동화 도구용 훅 (UI·기능과 무관하게 내부 상태 읽기만 제공)
-window.__MA__={get S(){return S},get ST(){return ST},ACT,buildQueue,startStudy,grade,curCard,save,load,route};
+window.__MA__={get S(){return S},get ST(){return ST},get delTomb(){return delTomb},ACT,buildQueue,startStudy,grade,curCard,save,load,route,hourHeat};
 </script>
 </body>
 </html>
